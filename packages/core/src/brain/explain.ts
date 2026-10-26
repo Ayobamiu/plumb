@@ -1,5 +1,5 @@
 // One-sentence explanations for transitions. Templates in code, never the LLM.
-import type { AbsencePattern, Claim, Event } from "../contract.js";
+import type { AbsencePattern, Claim, ClaimStatus, Event } from "../contract.js";
 
 const TZ = process.env.PLUMB_TZ ?? "America/New_York";
 
@@ -43,6 +43,17 @@ export function explainRestored(cause?: Claim): string {
   return cause
     ? `Back IN because "${cause.text}" was restored and its other reasons still hold.`
     : "Back IN because Usman marked it as still true.";
+}
+
+export function explainEdited(oldText: string, from: ClaimStatus): string {
+  return from === "IN"
+    ? `Usman edited it; it used to say "${oldText}".`
+    : `Back IN because Usman edited it; it used to say "${oldText}".`;
+}
+
+/** Fold Usman's note into the explanation, keeping it one sentence. */
+export function withNote(explanation: string, note: string): string {
+  return `${explanation.replace(/\.$/, "")} (note: ${note}).`;
 }
 
 export function explainConfirmedOut(): string {

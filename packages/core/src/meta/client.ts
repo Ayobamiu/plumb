@@ -10,10 +10,12 @@ export const MUSE_SPARK = "muse-spark-1.3";
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
-// USD per million tokens. Unknown until Usman reads them off the dashboard,
-// so they come from env and default to 0 (tokens are logged either way).
-const PRICE_IN = Number(process.env.META_PRICE_IN_PER_M ?? 0);
-const PRICE_OUT = Number(process.env.META_PRICE_OUT_PER_M ?? 0);
+// USD per million tokens, standard tier (dev.meta.ai pricing, checked Oct 26, 2026).
+// Not the cheaper contributor tier: that lets Meta train on prompts, and ours
+// carry email summaries. Env vars override if the prices change.
+const PRICE_IN = Number(process.env.META_PRICE_IN_PER_M ?? 1.25);
+const PRICE_CACHED_IN = Number(process.env.META_PRICE_CACHED_IN_PER_M ?? 0.15);
+const PRICE_OUT = Number(process.env.META_PRICE_OUT_PER_M ?? 4.25); // includes reasoning tokens
 const COST_LOG = process.env.META_COST_LOG ?? "logs/meta-calls.jsonl";
 
 export interface MetaCallLog {
@@ -23,6 +25,7 @@ export interface MetaCallLog {
   effort: ReasoningEffort;
   response_id?: string;
   input_tokens: number;
+  cached_input_tokens: number;
   output_tokens: number;
   reasoning_tokens: number;
   cost_usd: number;
@@ -57,6 +60,7 @@ export class MetaClient {
       model,
       effort,
       input_tokens: 0,
+      cached_input_tokens: 0,
       output_tokens: 0,
       reasoning_tokens: 0,
       cost_usd: 0,
@@ -85,8 +89,9 @@ export class MetaClient {
       log.response_id = body.id;
       log.input_tokens = body.usage?.input_tokens ?? 0;
       log.output_tokens = body.usage?.output_tokens ?? 0;
+      log.cached_input_tokens = body.usage?.input_tokens_details?.cached_tokens ?? 0;
       log.reasoning_tokens = body.usage?.output_tokens_details?.reasoning_tokens ?? 0;
-      log.cost_usd = (log.input_tokens * PRICE_IN + log.output_tokens * PRICE_OUT) / 1_000_000;
+      log.cost_usd = callCost(log);
 
       const text = body.output
         ?.filter((o) => o.type === "message")
@@ -106,6 +111,12 @@ export class MetaClient {
   }
 }
 
+/** Cached input tokens are part of input_tokens but bill at the cached rate. */
+export function callCost(t: Pick<MetaCallLog, "input_tokens" | "cached_input_tokens" | "output_tokens">): number {
+  const fresh = t.input_tokens - t.cached_input_tokens;
+  return (fresh * PRICE_IN + t.cached_input_tokens * PRICE_CACHED_IN + t.output_tokens * PRICE_OUT) / 1_000_000;
+}
+
 async function writeLog(log: MetaCallLog) {
   await mkdir(dirname(COST_LOG), { recursive: true });
   await appendFile(COST_LOG, JSON.stringify(log) + "\n");
@@ -117,6 +128,7 @@ interface ResponsesBody {
   output?: { type: string; content?: { type: string; text?: string }[] }[];
   usage?: {
     input_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number };
     output_tokens?: number;
     output_tokens_details?: { reasoning_tokens?: number };
   };
