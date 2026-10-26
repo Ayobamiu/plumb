@@ -7,16 +7,19 @@ import {
   ClaimKind,
   confirmOut,
   evaluateClaims,
+  explainContradicted,
   explainEdited,
   materializeClaims,
   onEvent,
   restore,
+  sendToReview,
   withNote,
   type BrainContext,
   type BrainState,
   type Change,
   type Claim,
   type ClaimStatus,
+  type Contradiction,
   type Event,
   type ExplainClaimInput,
   type ExplainClaimOutput,
@@ -30,6 +33,7 @@ import {
   type RecordEventOutput,
   type ResolveReviewInput,
   type ResolveReviewOutput,
+  type Transition,
 } from "@plumb/core";
 import { ConflictError, type ClaimUpdate, type Store } from "./store.js";
 
@@ -235,6 +239,23 @@ export function createHandlers(store: Store) {
 
         await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
         return { transitions: changes.map((c) => c.transition) };
+      });
+    },
+
+    /** Not an MCP tool: /ingest calls this when new text contradicts current claims. REVIEW only, never OUT. */
+    async review_contradictions(contradictions: Contradiction[], sourceTitle: string): Promise<Transition[]> {
+      if (contradictions.length === 0) return [];
+      return withRetry(async () => {
+        const ctx = context();
+        const state = await loadBrain(store);
+        const before = statuses(state);
+        const changes = contradictions.flatMap((c) =>
+          state.claims.has(c.claim_id)
+            ? sendToReview(state, c.claim_id, ctx, { explanation: explainContradicted(sourceTitle, c.quote) })
+            : [],
+        );
+        await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
+        return changes.map((c) => c.transition);
       });
     },
   };

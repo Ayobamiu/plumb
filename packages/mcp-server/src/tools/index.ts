@@ -5,6 +5,10 @@
 //   const store = SupabaseStore.fromEnv();
 //   const result = await callTool(store, "record_event", body);
 // It throws ToolError with code "bad_input" (HTTP 400) or "not_found" (404).
+//
+// POST /ingest is not an MCP tool; it needs a model client too:
+//   const body = IngestInput.parse(json); // from @plumb/core, 400 on failure
+//   const result = await ingest(store, new MetaClient(), body);
 import {
   ExplainClaimInput,
   GetProjectStateInput,
@@ -52,6 +56,7 @@ export async function callTool(store: Store, name: string, input: unknown): Prom
 }
 
 export { createHandlers, ToolError } from "./handlers.js";
+export { ingest, knownThreads } from "./ingest.js";
 export { ConflictError, type Store, type BrainWrite, type ProjectWithCounts } from "./store.js";
 export { SupabaseStore } from "./supabase-store.js";
 export { MemoryStore } from "./memory-store.js";

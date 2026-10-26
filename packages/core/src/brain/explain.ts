@@ -56,6 +56,11 @@ export function withNote(explanation: string, note: string): string {
   return `${explanation.replace(/\.$/, "")} (note: ${note}).`;
 }
 
+/** A model read new text and thinks it contradicts the claim. Usman decides. */
+export function explainContradicted(sourceTitle: string, quote: string): string {
+  return `Sent to REVIEW because ${sourceTitle} said: "${quote.replace(/[.!?]+$/, "")}".`;
+}
+
 export function explainConfirmedOut(): string {
   return "Went OUT because Usman confirmed it is no longer true.";
 }

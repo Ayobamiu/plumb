@@ -106,3 +106,23 @@ export const ResolveReviewInput = z.object({
   note: z.string().optional(),
 });
 export const ResolveReviewOutput = z.object({ transitions: z.array(Transition) });
+
+// ingest (POST /ingest, not an MCP tool): text in, claims out via extraction
+// (Brain Part A), then record_claims. Every write-back path ends here.
+export const IngestInput = z.object({
+  project_id: z.string(),
+  source: z.object({
+    kind: SourceKind,
+    external_id: z.string(),
+    uri: z.string().optional(),
+    title: z.string().optional(),
+  }),
+  text: z.string().min(1),
+  at: Timestamp.optional(), // when the text was written; default now
+});
+export const IngestOutput = RecordClaimsOutput.extend({
+  extracted_by: z.string(),
+  review: z.array(Transition), // current claims the text contradicts, sent to REVIEW
+  dropped: z.array(z.object({ text: z.string(), why: z.string() })),
+  truncated: z.boolean(), // text was longer than the limit; only the end was read
+});

@@ -41,8 +41,15 @@ export function normalizeAddress(from: string): string {
   return (m ? m[1]! : from).trim().toLowerCase();
 }
 
+/** Code matches an absence only if it names a sender, thread or source. The rest go to the model check. */
+export function hasCodePattern(pattern: AbsencePattern): boolean {
+  return pattern.from !== undefined || pattern.thread_id !== undefined || pattern.source_id !== undefined;
+}
+
 /** An absence breaks when the event matches every filled field and happened after `since`. */
 export function absenceBrokenBy(pattern: AbsencePattern, since: string, event: Event): boolean {
+  // A pattern with only event_kind (and maybe text_hint) would match every email.
+  if (!hasCodePattern(pattern)) return false;
   if (event.kind !== pattern.event_kind) return false;
   if (ms(event.occurred_at) <= ms(since)) return false;
   if (pattern.from !== undefined) {

@@ -75,6 +75,17 @@ describe("onEvent", () => {
     expect(state.transitions).toHaveLength(3);
   });
 
+  it("never matches an absence that names no sender, thread or source", () => {
+    const hintOnly = {
+      type: "absence" as const,
+      since: "2026-10-25T00:00:00Z",
+      pattern: { event_kind: "email_received" as const, text_hint: "Avery says yes" },
+    };
+    const { state, status } = setup([claim("a", [hintOnly])]);
+    expect(onEvent(state, email("t1"), ctx)).toEqual([]);
+    expect(status("a")).toBe("IN");
+  });
+
   it("stops on dependency loops", () => {
     const { state, status } = setup([claim("a", [absence("t1"), dep("b")]), claim("b", [dep("a")])]);
     const changes = onEvent(state, email("t1"), ctx);
