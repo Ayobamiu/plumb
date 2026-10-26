@@ -1,0 +1,46 @@
+---
+description: Plumb project handoff for Cursor
+alwaysApply: true
+---
+
+# Plumb: handoff for Cursor
+
+Plumb keeps one shared set of truths that all of Usman's AI tools (Claude Code, Cursor, Claude chat) read from and write to, and keeps it correct on its own. Every claim is stored with the reasons it holds. When new evidence (an email, a doc edit, time passing) breaks a reason, plain code marks the claim OUT and follows the chain to every claim built on it.
+
+Built for the Meta Global AI Developer Hackathon. Submission due Nov 4, 2026, 9 PM ET.
+
+## Source of truth
+
+The spec lives in Usman's Docs app, read through the docs MCP:
+
+- Document: "Context Tool, Meta Hack" (id ede34f81-56d6-46e1-8189-691d8803f9eb)
+- At the start of every task, read Overview, 1. Contract, the tabs you own (4 and 6), and 7. Progress log.
+- The Contract is final. Never redefine its types. Import them from packages/core.
+
+If the doc and this file disagree, the doc wins.
+
+## Your role
+
+- apps/web: the homepage in tab 6. One page: "what stopped being true since I last looked, and why?" Live updates from Supabase realtime on the transitions table.
+- packages/watchers: Gmail polling every 60 seconds (gmail.readonly), the doc watcher, the clock job. Each one calls record_event.
+- integrations/: Claude Code hooks (SessionStart, SessionEnd, Stop), Cursor hooks (afterAgentResponse, stop) and the rules file, Claude chat connector setup.
+- Auth: Gmail OAuth in testing mode, refresh token encrypted in Supabase Vault, one bearer token per tool for the MCP server.
+- Deploy: host the MCP server on a public URL early (target day 2).
+
+Claude Code owns packages/core, packages/mcp-server/src/tools, supabase/migrations, prompts/ and evals/. Don't edit those. If you need something from them, write it under "Blocked or needs" in the Progress log and continue with something else.
+
+## Start order
+
+Claude Code goes first on day 1: repo layout, types, database. Wait for its first Progress log entry before writing code outside apps/web. Until then you can scaffold apps/web only.
+
+## Known risks
+
+- Cursor hooks: some outputs reportedly don't reach the model, and lifecycle hooks don't run in Cloud Agents. Run locally, and use hooks only to send data out.
+- Hook formats change. Check current docs before building.
+
+## Rules
+
+- Never print, log or commit .env or any key.
+- Plain, fast UI. No extra pages this week.
+- End every task with a short Progress log entry: done, decisions, blocked or needs.
+- All UI text and docs: short and plain. Never use em dashes.

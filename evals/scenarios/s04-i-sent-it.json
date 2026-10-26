@@ -1,0 +1,38 @@
+{
+  "id": "s04",
+  "title": "Usman sends the email himself: I need to reply to Jordan goes OUT on email_sent in that thread only.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T09:30:00Z",
+  "claims": [
+    {
+      "temp_id": "need_reply",
+      "text": "I need to reply to Jordan about the venue.",
+      "kind": "next_step",
+      "valid_from": "2026-10-26T09:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-26T09:00:00Z",
+          "pattern": { "event_kind": "email_sent", "thread_id": "t-venue-7" } }
+      ]
+    },
+    {
+      "temp_id": "waiting_on_me",
+      "text": "The venue booking is waiting on me.",
+      "kind": "status",
+      "valid_from": "2026-10-26T09:00:00Z",
+      "reasons": [{ "type": "depends_on", "claim": "need_reply" }]
+    }
+  ],
+  "events": [
+    { "key": "jordan_again", "kind": "email_received", "occurred_at": "2026-10-26T11:00:00Z",
+      "from": "jordan.reyes@example.net", "thread_id": "t-venue-7", "summary": "Re: Venue: any update?" },
+    { "key": "sent_other_thread", "kind": "email_sent", "occurred_at": "2026-10-26T12:00:00Z",
+      "from": "me@example.com", "thread_id": "t-venue-8", "summary": "Catering quote" },
+    { "key": "sent_reply", "kind": "email_sent", "occurred_at": "2026-10-26T13:00:00Z",
+      "from": "me@example.com", "thread_id": "t-venue-7", "summary": "Re: Venue: booked for Friday" }
+  ],
+  "expected": [
+    { "after": "jordan_again", "status": {} },
+    { "after": "sent_other_thread", "status": {} },
+    { "after": "sent_reply", "status": { "need_reply": "OUT", "waiting_on_me": "OUT" }, "chain": ["waiting_on_me"] }
+  ]
+}

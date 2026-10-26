@@ -1,0 +1,42 @@
+{
+  "id": "s03",
+  "title": "A deadline passes: hackathon is live goes OUT after Nov 4, 9 PM ET, not before and not at the exact second.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "live",
+      "text": "The hackathon is live.",
+      "kind": "status",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [{ "type": "until", "at": "2026-11-05T02:00:00Z" }]
+    },
+    {
+      "temp_id": "can_edit",
+      "text": "We can still change the submission.",
+      "kind": "status",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [{ "type": "depends_on", "claim": "live" }]
+    },
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from the judges yet.",
+      "kind": "status",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-26T12:00:00Z",
+          "pattern": { "event_kind": "email_received", "from": "judges@example.com" } }
+      ]
+    }
+  ],
+  "events": [
+    { "key": "tick_before", "kind": "clock", "occurred_at": "2026-11-04T20:00:00Z", "summary": "clock tick" },
+    { "key": "tick_exact", "kind": "clock", "occurred_at": "2026-11-05T02:00:00Z", "summary": "clock tick" },
+    { "key": "tick_after", "kind": "clock", "occurred_at": "2026-11-05T02:01:00Z", "summary": "clock tick" }
+  ],
+  "expected": [
+    { "after": "tick_before", "status": {} },
+    { "after": "tick_exact", "status": {} },
+    { "after": "tick_after", "status": { "live": "OUT", "can_edit": "OUT" }, "chain": ["can_edit"] }
+  ]
+}

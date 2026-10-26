@@ -1,0 +1,42 @@
+{
+  "id": "s02",
+  "title": "A decision changes: LOI pending goes OUT when the answer arrives. An older email seen late must not count.",
+  "split": "dev",
+  "recorded_at": "2026-10-24T18:00:00Z",
+  "claims": [
+    {
+      "temp_id": "loi_pending",
+      "text": "The LOI decision is still pending.",
+      "kind": "status",
+      "valid_from": "2026-10-24T16:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-24T16:00:00Z",
+          "pattern": { "event_kind": "email_received", "from": "avery.hart@northfield.edu", "thread_id": "t-loi-101" } }
+      ]
+    },
+    {
+      "temp_id": "budget",
+      "text": "The budget assumes no LOI money yet.",
+      "kind": "decision",
+      "valid_from": "2026-10-24T16:00:00Z",
+      "reasons": [{ "type": "depends_on", "claim": "loi_pending" }]
+    },
+    {
+      "temp_id": "deadline_fact",
+      "text": "Hackathon submissions are due Nov 4, 9 PM ET.",
+      "kind": "fact",
+      "valid_from": "2026-10-24T16:00:00Z",
+      "reasons": [{ "type": "until", "at": "2026-11-05T02:00:00Z" }]
+    }
+  ],
+  "events": [
+    { "key": "old_email_seen_late", "kind": "email_received", "occurred_at": "2026-10-23T09:00:00Z",
+      "from": "avery.hart@northfield.edu", "thread_id": "t-loi-101", "summary": "Re: LOI: still reviewing" },
+    { "key": "answer", "kind": "email_received", "occurred_at": "2026-10-26T14:00:00Z",
+      "from": "avery.hart@northfield.edu", "thread_id": "t-loi-101", "summary": "Re: LOI: decision attached" }
+  ],
+  "expected": [
+    { "after": "old_email_seen_late", "status": {} },
+    { "after": "answer", "status": { "loi_pending": "OUT", "budget": "OUT" }, "chain": ["budget"] }
+  ]
+}

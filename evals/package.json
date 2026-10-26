@@ -1,0 +1,14 @@
+{
+  "name": "@plumb/evals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "tsx src/run.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@plumb/core": "workspace:*",
+    "zod": "^3.23.8"
+  }
+}
