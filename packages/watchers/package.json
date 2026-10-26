@@ -1,0 +1,19 @@
+{
+  "name": "@plumb/watchers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "gmail": "tsx --env-file=../../.env src/gmail.ts",
+    "clock": "tsx --env-file=../../.env src/clock.ts"
+  },
+  "dependencies": {
+    "@plumb/core": "workspace:*",
+    "@supabase/supabase-js": "^2.49.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
