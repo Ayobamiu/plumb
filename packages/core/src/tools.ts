@@ -124,6 +124,8 @@ export const IngestInput = z.object({
 export const IngestOutput = RecordClaimsOutput.extend({
   extracted_by: z.string(),
   review: z.array(Transition), // current claims the text contradicts, sent to REVIEW
+  event: Event, // the text as a doc_edited or session_note event, with a short summary
+  event_transitions: z.array(Transition), // what that event changed (Part B, and Part C REVIEWs)
   dropped: z.array(z.object({ text: z.string(), why: z.string() })),
   truncated: z.boolean(), // text was longer than the limit; only the end was read
 });

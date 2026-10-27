@@ -14,9 +14,15 @@ const r = (x: Record<string, unknown>) => ({
   ...x,
 });
 
-function fakeModel(output: unknown): JsonModel & { user?: string } {
-  const model: JsonModel & { user?: string } = {
+// Answers extraction with `output`; answers model checks with `verdict` (default "no").
+function fakeModel(output: unknown, verdict: unknown = { verdict: "no", quote: null, why: "" }): JsonModel & { user?: string; checks: string[] } {
+  const model: JsonModel & { user?: string; checks: string[] } = {
+    checks: [],
     async json(opts) {
+      if (opts.schemaName === "verdict") {
+        model.checks.push(opts.user);
+        return opts.parse.parse(verdict) as never;
+      }
       model.user = opts.user;
       return opts.parse.parse(output) as never;
     },
@@ -69,7 +75,7 @@ describe("ingest", () => {
 
     expect(model.user).toContain('thread_id t-loi: "LOI: sending it over" with avery@northfield.edu');
     expect(out.claims).toHaveLength(2);
-    expect(out.extracted_by).toBe("muse-spark-1.3/extract.v3");
+    expect(out.extracted_by).toBe("muse-spark-1.3/extract.v4");
     expect(out.dropped).toEqual([]);
 
     const reply: any = await callTool(store, "record_event", {
@@ -135,3 +141,55 @@ describe("knownThreads", () => {
     ]);
   });
 });
+
+describe("ingest records the text as an event", () => {
+  const extraction = (claims: unknown[] = [], summary = "Avery said the LOI is signed.") => ({ claims, contradicts: [], summary });
+
+  it("stores a session_note with the model's summary, and Part C checks current claims against it", async () => {
+    const store = new MemoryStore();
+    const project = store.addProject("p");
+    const recorded: any = await callTool(store, "record_claims", {
+      project_id: project.id,
+      source: { kind: "claude_code", external_id: "s0" },
+      extracted_by: "t",
+      claims: [{ text: "No word from Avery on the LOI.", kind: "status", valid_from: "2026-10-25T00:00:00Z", reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] }],
+    }, { model: null });
+    const model = fakeModel(extraction(), { verdict: "yes", quote: "the LOI is signed", why: "Avery replied." });
+    const out = await ingest(store, model, {
+      project_id: project.id,
+      source: { kind: "cursor", external_id: "c1", title: "Cursor session" },
+      text: "Long session... Avery called: the LOI is signed.",
+    });
+    expect(out.event).toMatchObject({ kind: "session_note", summary: "Avery said the LOI is signed." });
+    expect(store.events.map((e) => e.kind)).toEqual(["session_note"]);
+    expect(model.checks).toHaveLength(1);
+    expect(out.event_transitions[0]).toMatchObject({ to_status: "REVIEW", event_id: out.event.id });
+    expect(store.claims.get(recorded.claims[0].id)!.status).toBe("REVIEW");
+  });
+
+  it("never checks a claim against the text that created it", async () => {
+    const store = new MemoryStore();
+    const project = store.addProject("p");
+    const claim = { ref: "n1", text: "Avery signed the LOI.", kind: "status", valid_from: "2026-10-20T00:00:00Z", confidence: 1, same_as: null, reasons: [r({ type: "until", at: "2027-01-01T00:00:00Z" })] };
+    const model = fakeModel(extraction([claim]), { verdict: "yes", quote: "signed", why: "" });
+    const out = await ingest(store, model, { project_id: project.id, source: { kind: "claude_code", external_id: "s1" }, text: "Avery signed the LOI." });
+    expect(model.checks).toEqual([]);
+    expect(store.claims.get(out.claims[0]!.id)!.status).toBe("IN");
+  });
+
+  it("uses doc_edited for a doc, and the end of the text when extraction fails", async () => {
+    const store = new MemoryStore();
+    const project = store.addProject("p");
+    const failing: JsonModel = { async json() { throw new Error("down"); } };
+    const out = await ingest(store, failing, {
+      project_id: project.id,
+      source: { kind: "doc", external_id: "doc-1#tab-2", title: "Launch plan: Decisions" },
+      text: "x".repeat(700) + " We moved hosting to Fly.io.",
+    });
+    expect(out.event.kind).toBe("doc_edited");
+    expect(out.event.summary.startsWith("...")).toBe(true);
+    expect(out.event.summary.endsWith("We moved hosting to Fly.io.")).toBe(true);
+    expect(out.event.summary.length).toBeLessThanOrEqual(1000);
+  });
+});
+

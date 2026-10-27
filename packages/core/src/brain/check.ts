@@ -70,7 +70,8 @@ export function selectCandidates(state: BrainState, event: Event, max = MAX_CAND
     const named = names.filter((n) => claimWords.has(n));
     if (named.length) (score += 2), signals.push(`sender named in claim (${named.join(", ")})`);
     const shared = [...words([claim.text, ...hints].join(" "))].filter((w) => eventWords.has(w));
-    if (shared.length >= 2) (score += shared.length - 1), signals.push(`shared words (${shared.join(", ")})`);
+    // Two shared words are enough on their own: session notes and doc edits have no sender or thread to match.
+    if (shared.length >= 2) (score += shared.length), signals.push(`shared words (${shared.join(", ")})`);
     // One weak signal is not enough; two shared words or any strong one is.
     if (score >= 2) out.push({ claim, score, signals: [...new Set(signals)] });
   }

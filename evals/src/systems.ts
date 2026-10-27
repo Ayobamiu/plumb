@@ -100,6 +100,8 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
       }
     } else if (step.type === "text") {
       const t = step.text;
+      // As in production (/ingest): one source per kind and external id.
+      const sourceId = `text:${t.source.kind}:${t.source.external_id}`;
       const result = await extractClaims(model!, {
         text: t.text,
         source: { kind: t.source.kind, ...(t.source.title && { title: t.source.title }) },
@@ -108,9 +110,22 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
         in_claims: [...state.claims.values()].filter((c) => c.status === "IN"),
         threads: knownThreads(state.events),
       });
+      // The text becomes an event first (Parts B and C run on it, the sweep
+      // re-reads it later); its own claims are added after, as /ingest does.
+      const textEvent: Event = {
+        id: `t-${step.key}`,
+        kind: t.source.kind === "doc" ? "doc_edited" : "session_note",
+        source_id: sourceId,
+        occurred_at: t.at,
+        observed_at: t.at,
+        summary: (result.summary || t.text.slice(-600)).slice(0, 1000),
+      };
+      onEvent(state, textEvent, ctx);
+      const checked = await modelCheck(model!, textEvent, selectCandidates(state, textEvent));
+      for (const f of checked.flags) sendToReview(state, f.claim_id, ctx, { explanation: f.explanation, event_id: f.event_id });
       const added = materializeClaims({
         project_id: s.id,
-        source_id: `text:${t.key}`,
+        source_id: sourceId,
         extracted_by: result.extracted_by,
         recorded_at: t.at,
         claims: result.claims,

@@ -40,7 +40,7 @@ export interface JsonCallOptions<T> {
   user: string;
   schemaName: string;
   jsonSchema: Record<string, unknown>; // sent to the model
-  parse: z.ZodType<T>; // checked in code after the call
+  parse: z.ZodType<T, z.ZodTypeDef, unknown>; // checked in code after the call; only its output type matters
   effort?: ReasoningEffort;
   model?: string;
 }

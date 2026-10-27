@@ -11,10 +11,11 @@ import { MUSE_SPARK, type JsonCallOptions } from "../meta/client.js";
 import type { NewClaim, NewReason } from "../tools.js";
 import { normalizeAddress } from "./invalidate.js";
 
-export const EXTRACT_PROMPT = "extract.v3";
+export const EXTRACT_PROMPT = "extract.v4";
 const MAX_CLAIMS = 20;
 const QUOTE_MAX = 200;
 const MAX_THREADS = 50;
+const SUMMARY_MAX = 600;
 const SUBJECT_MAX = 120;
 
 /** What extraction needs from a model client. MetaClient fits; tests pass a fake. */
@@ -51,6 +52,7 @@ export interface ExtractResult {
   claims: NewClaim[];
   contradicts: Contradiction[];
   dropped: Dropped[];
+  summary: string; // what the text reports happened; empty if the model call failed
   extracted_by: string; // model id plus prompt version
 }
 
@@ -102,6 +104,7 @@ const ModelClaim = z.object({
 const ModelOutput = z.object({
   claims: z.array(ModelClaim),
   contradicts: z.array(z.object({ ref: z.string(), quote: z.string() })),
+  summary: z.string().catch(""), // older answers and test fakes may leave it out
 });
 type ModelOutput = z.infer<typeof ModelOutput>;
 type ModelReason = z.infer<typeof ModelReason>;
@@ -141,6 +144,7 @@ export const EXTRACT_JSON_SCHEMA = object({
     }),
   },
   contradicts: { type: "array", items: object({ ref: str, quote: str }) },
+  summary: str,
 });
 
 // ---- Prompt files live in /prompts, versioned, so evals can compare them.
@@ -281,7 +285,7 @@ export function checkExtraction(out: ModelOutput, input: ExtractInput): Omit<Ext
       contradicts.push({ claim_id, quote: c.quote.trim().slice(0, QUOTE_MAX) });
     }
   }
-  return { claims, contradicts, dropped };
+  return { claims, contradicts, dropped, summary: (out.summary ?? "").trim().slice(0, SUMMARY_MAX) };
 }
 
 /** Extract claims from one chunk of text. Retries the model call once, then gives up and reports it. */
@@ -310,6 +314,7 @@ export async function extractClaims(model: JsonModel, input: ExtractInput, model
     claims: [],
     contradicts: [],
     dropped: [{ text: "(whole text)", why: `extraction failed twice: ${lastError}` }],
+    summary: "",
     extracted_by,
   };
 }
