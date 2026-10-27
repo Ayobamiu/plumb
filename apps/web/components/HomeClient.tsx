@@ -49,7 +49,7 @@ function FeedBlock({
         {item.event ? ` · broke on: ${item.event.summary}` : ""}
       </p>
       {item.transition.to_status === "REVIEW" ? (
-        <ReviewActions claimId={item.claim.id} />
+        <ReviewActions claimId={item.claim.id} claimText={item.claim.text} />
       ) : null}
       {item.children.length > 0 ? (
         <div className="children">

@@ -104,6 +104,8 @@ export async function loadHomeData(since = defaultSince()): Promise<HomeData> {
     const projects: ProjectWithCounts[] = [];
     for (const row of projectsRaw ?? []) {
       const project = rowToProject(row as Record<string, unknown>);
+      // Internal DB smoke project; hide from the homepage.
+      if (project.name === "Smoke test") continue;
       const { data: statusRows, error: countError } = await db
         .from("claims")
         .select("status")
