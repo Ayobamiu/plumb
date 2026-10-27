@@ -1,6 +1,6 @@
 {
   "id": "s05",
-  "title": "Same sender, different thread: the thread-scoped absence must stay IN. Tests false retractions.",
+  "title": "Same sender, different thread: the thread-scoped absence must stay IN. Tests false retractions. Usman's own nudge in the contract thread is the follow-up done early, so the follow-up goes to REVIEW (label changed Oct 27 on Usman's go-ahead, following the v2 rule that a done task is stale).",
   "split": "dev",
   "recorded_at": "2026-10-25T10:00:00Z",
   "claims": [
@@ -10,8 +10,15 @@
       "kind": "status",
       "valid_from": "2026-10-25T09:00:00Z",
       "reasons": [
-        { "type": "absence", "since": "2026-10-25T09:00:00Z",
-          "pattern": { "event_kind": "email_received", "from": "priya.nair@example.org", "thread_id": "t-contract-3" } }
+        {
+          "type": "absence",
+          "since": "2026-10-25T09:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "priya.nair@example.org",
+            "thread_id": "t-contract-3"
+          }
+        }
       ]
     },
     {
@@ -19,20 +26,54 @@
       "text": "Follow up with Priya on Thursday.",
       "kind": "next_step",
       "valid_from": "2026-10-25T09:00:00Z",
-      "reasons": [{ "type": "depends_on", "claim": "no_reply" }]
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "no_reply"
+        }
+      ]
     }
   ],
   "events": [
-    { "key": "priya_lunch", "kind": "email_received", "occurred_at": "2026-10-26T12:00:00Z",
-      "from": "priya.nair@example.org", "thread_id": "t-lunch-9", "summary": "Lunch Friday?" },
-    { "key": "legal_in_thread", "kind": "email_received", "occurred_at": "2026-10-26T13:00:00Z",
-      "from": "legal@example.org", "thread_id": "t-contract-3", "summary": "Re: Contract: looping in legal" },
-    { "key": "priya_sent_by_me", "kind": "email_sent", "occurred_at": "2026-10-26T14:00:00Z",
-      "from": "me@example.com", "thread_id": "t-contract-3", "summary": "Re: Contract: gentle nudge" }
+    {
+      "key": "priya_lunch",
+      "kind": "email_received",
+      "occurred_at": "2026-10-26T12:00:00Z",
+      "from": "priya.nair@example.org",
+      "thread_id": "t-lunch-9",
+      "summary": "Lunch Friday?"
+    },
+    {
+      "key": "legal_in_thread",
+      "kind": "email_received",
+      "occurred_at": "2026-10-26T13:00:00Z",
+      "from": "legal@example.org",
+      "thread_id": "t-contract-3",
+      "summary": "Re: Contract: looping in legal"
+    },
+    {
+      "key": "priya_sent_by_me",
+      "kind": "email_sent",
+      "occurred_at": "2026-10-26T14:00:00Z",
+      "from": "me@example.com",
+      "thread_id": "t-contract-3",
+      "summary": "Re: Contract: gentle nudge"
+    }
   ],
   "expected": [
-    { "after": "priya_lunch", "status": {} },
-    { "after": "legal_in_thread", "status": {} },
-    { "after": "priya_sent_by_me", "status": {} }
+    {
+      "after": "priya_lunch",
+      "status": {}
+    },
+    {
+      "after": "legal_in_thread",
+      "status": {}
+    },
+    {
+      "after": "priya_sent_by_me",
+      "status": {
+        "follow_up": "REVIEW"
+      }
+    }
   ]
 }

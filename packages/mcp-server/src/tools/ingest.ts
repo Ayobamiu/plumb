@@ -6,45 +6,17 @@ import type { z } from "zod";
 import {
   explainContradicted,
   extractClaims,
-  normalizeAddress,
-  type Event,
+  knownThreads,
   type IngestInput,
   type IngestOutput,
   type JsonModel,
-  type KnownThread,
 } from "@plumb/core";
 import { createHandlers, ToolError } from "./handlers.js";
 import type { Store } from "./store.js";
 
 const MAX_CHARS = 200_000; // about 50k tokens; longer text keeps its end, the most recent part
 const MAX_IN_CLAIMS = 200;
-const MAX_THREADS = 50;
 const THREAD_DAYS = 30;
-const SUBJECT_MAX = 120;
-
-/** Email threads seen recently, newest first, with who wrote in each. */
-export function knownThreads(events: Event[]): KnownThread[] {
-  const byThread = new Map<string, { thread: KnownThread; last: number }>();
-  for (const e of events) {
-    if (!e.thread_id) continue;
-    const at = Date.parse(e.occurred_at);
-    const entry = byThread.get(e.thread_id) ?? { thread: { thread_id: e.thread_id, subject: "", participants: [] }, last: 0 };
-    if (at >= entry.last) {
-      entry.last = at;
-      entry.thread.subject = e.summary.slice(0, SUBJECT_MAX);
-    }
-    // Sent mail is from Usman; the model never needs his address in a pattern.
-    if (e.kind === "email_received" && e.from) {
-      const from = normalizeAddress(e.from);
-      if (!entry.thread.participants.includes(from)) entry.thread.participants.push(from);
-    }
-    byThread.set(e.thread_id, entry);
-  }
-  return [...byThread.values()]
-    .sort((a, b) => b.last - a.last)
-    .slice(0, MAX_THREADS)
-    .map((x) => x.thread);
-}
 
 export async function ingest(
   store: Store,

@@ -1,0 +1,51 @@
+{
+  "id": "s16",
+  "title": "Noise: an agent turn full of bookkeeping (commit hash, test counts, doc revision) with one decision, one next step and one open question. Measures extra claims; all stay IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T20:00:00Z",
+  "texts": [
+    {
+      "key": "agent_turn",
+      "at": "2026-10-26T20:00:00Z",
+      "source": {
+        "kind": "claude_code",
+        "external_id": "cc-3",
+        "title": "Claude Code turn"
+      },
+      "text": "Committed as 7f1fab5. Typecheck passes in all 5 packages, and 32 tests pass (15 core, 17 server). Progress log updated to revision 28. The evals are unchanged at 5/5 with 0 false retractions.\n\nDecision: extraction runs at reasoning effort medium.\nNext: Cursor exposes POST /ingest on the server.\nOpen question: should the SessionEnd hook send the whole transcript or a trimmed one?"
+    }
+  ],
+  "find": {
+    "effort": [
+      "medium"
+    ],
+    "ingest_next": [
+      "ingest"
+    ],
+    "transcript_q": [
+      "transcript"
+    ]
+  },
+  "events": [
+    {
+      "key": "newsletter",
+      "kind": "email_received",
+      "occurred_at": "2026-10-27T08:00:00Z",
+      "thread_id": "t-news-1",
+      "summary": "This week in AI tooling",
+      "from": "news@example.com"
+    }
+  ],
+  "expected": [
+    {
+      "after": "agent_turn",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "newsletter",
+      "status": {},
+      "chain": []
+    }
+  ]
+}

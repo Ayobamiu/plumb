@@ -1,0 +1,51 @@
+{
+  "id": "h08",
+  "title": "Cross-tool: Cursor says staging is deployed and working; a later Claude Code session says staging is down after a failed migration. The first claim goes to REVIEW.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T11:00:00Z",
+  "texts": [
+    {
+      "key": "cursor_note",
+      "at": "2026-10-27T11:00:00Z",
+      "source": {
+        "kind": "cursor",
+        "external_id": "cur-8",
+        "title": "Cursor session"
+      },
+      "text": "Staging is deployed and working; the new dashboard loads in under a second."
+    },
+    {
+      "key": "cc_note",
+      "at": "2026-10-27T16:00:00Z",
+      "source": {
+        "kind": "claude_code",
+        "external_id": "cc-9",
+        "title": "Claude Code session"
+      },
+      "text": "Staging has been down since the 2 PM database migration failed halfway. Rolling back now."
+    }
+  ],
+  "find": {
+    "staging_ok": [
+      "staging",
+      "work"
+    ],
+    "staging_down": [
+      "down"
+    ]
+  },
+  "expected": [
+    {
+      "after": "cursor_note",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "cc_note",
+      "status": {
+        "staging_ok": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "s14",
+  "title": "End to end: 'I owe Jordan a reply' goes OUT when Usman's own reply is sent in that thread. The headcount fact stays IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T18:00:00Z",
+  "texts": [
+    {
+      "key": "note",
+      "at": "2026-10-25T18:00:00Z",
+      "source": {
+        "kind": "claude_chat",
+        "external_id": "chat-1",
+        "title": "Claude chat"
+      },
+      "text": "Reminder for myself: I owe Jordan at Hallway a reply with our demo day headcount. We're planning for 40 people."
+    }
+  ],
+  "find": {
+    "owe_jordan": [
+      "jordan"
+    ],
+    "headcount": [
+      "40"
+    ]
+  },
+  "events": [
+    {
+      "key": "jordan_asks",
+      "kind": "email_received",
+      "occurred_at": "2026-10-25T15:00:00Z",
+      "thread_id": "t-venue-2",
+      "summary": "Demo day venue: can you confirm your headcount by Wednesday?",
+      "from": "Jordan Kim <jordan.kim@hallway.io>"
+    },
+    {
+      "key": "usman_replies",
+      "kind": "email_sent",
+      "occurred_at": "2026-10-26T10:00:00Z",
+      "thread_id": "t-venue-2",
+      "summary": "Re: Demo day venue: we'll be 40 people"
+    }
+  ],
+  "expected": [
+    {
+      "after": "note",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "usman_replies",
+      "status": {
+        "owe_jordan": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

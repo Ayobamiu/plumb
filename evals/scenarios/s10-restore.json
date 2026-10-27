@@ -1,0 +1,93 @@
+{
+  "id": "s10",
+  "title": "Restore: an out-of-office auto-reply knocks down the claim and its follow-up; Usman restores it and both come back IN; the real reply later knocks both down again.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T10:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Jordan at Hallway about the demo day headcount.",
+      "kind": "status",
+      "valid_from": "2026-10-25T09:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-25T09:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "jordan.kim@hallway.io",
+            "thread_id": "t-venue-2"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "nudge",
+      "text": "Nudge Jordan about the headcount on Wednesday.",
+      "kind": "next_step",
+      "valid_from": "2026-10-25T09:00:00Z",
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "no_reply"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "auto_reply",
+      "kind": "email_received",
+      "occurred_at": "2026-10-26T08:00:00Z",
+      "thread_id": "t-venue-2",
+      "summary": "Automatic reply: Out of office until Oct 28",
+      "from": "Jordan Kim <jordan.kim@hallway.io>"
+    },
+    {
+      "key": "real_reply",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T14:00:00Z",
+      "thread_id": "t-venue-2",
+      "summary": "Re: Demo day: 40 seats confirmed",
+      "from": "jordan.kim@hallway.io"
+    }
+  ],
+  "actions": [
+    {
+      "key": "usman_restores",
+      "at": "2026-10-26T09:00:00Z",
+      "action": "restore_in",
+      "claim": "no_reply"
+    }
+  ],
+  "expected": [
+    {
+      "after": "auto_reply",
+      "status": {
+        "no_reply": "OUT",
+        "nudge": "OUT"
+      },
+      "chain": [
+        "nudge"
+      ]
+    },
+    {
+      "after": "usman_restores",
+      "status": {
+        "no_reply": "IN",
+        "nudge": "IN"
+      },
+      "chain": []
+    },
+    {
+      "after": "real_reply",
+      "status": {
+        "no_reply": "OUT",
+        "nudge": "OUT"
+      },
+      "chain": [
+        "nudge"
+      ]
+    }
+  ]
+}

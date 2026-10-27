@@ -1,0 +1,64 @@
+{
+  "id": "s13",
+  "title": "End to end: a session note says we are waiting on Rosa and will check in Thursday; extraction finds her real thread; her reply knocks down both. The pricing prep stays IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T16:00:00Z",
+  "texts": [
+    {
+      "key": "session",
+      "at": "2026-10-25T16:00:00Z",
+      "source": {
+        "kind": "claude_code",
+        "external_id": "cc-2",
+        "title": "Claude Code session"
+      },
+      "text": "Still waiting on Rosa at Kiln Studio to get back to us on the pilot proposal; she said she'd go over it with her team. If I hear nothing by Thursday I'll send her a short check-in. Separately, I need to prep the pricing one-pager before the Kiln call."
+    }
+  ],
+  "find": {
+    "rosa_waiting": [
+      "rosa"
+    ],
+    "check_in": [
+      "check"
+    ],
+    "pricing": [
+      "pricing"
+    ]
+  },
+  "events": [
+    {
+      "key": "rosa_ack",
+      "kind": "email_received",
+      "occurred_at": "2026-10-24T11:00:00Z",
+      "thread_id": "t-kiln-1",
+      "summary": "Kiln pilot: proposal received, I'll review it with the team",
+      "from": "Rosa Lima <rosa@kiln.studio>"
+    },
+    {
+      "key": "rosa_yes",
+      "kind": "email_received",
+      "occurred_at": "2026-10-27T13:00:00Z",
+      "thread_id": "t-kiln-1",
+      "summary": "Re: Kiln pilot: we're in, let's start on Nov 10",
+      "from": "Rosa Lima <rosa@kiln.studio>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "session",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "rosa_yes",
+      "status": {
+        "rosa_waiting": "OUT",
+        "check_in": "OUT"
+      },
+      "chain": [
+        "check_in"
+      ]
+    }
+  ]
+}

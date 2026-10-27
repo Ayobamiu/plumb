@@ -1,0 +1,44 @@
+{
+  "id": "h04",
+  "title": "Grace answers in a brand new thread: the pattern misses, the model check sends the claim to REVIEW.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Grace Mensah about the partnership terms.",
+      "kind": "status",
+      "valid_from": "2026-10-27T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-27T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "grace@tidewater.org",
+            "thread_id": "t-terms-9"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "grace_new",
+      "kind": "email_received",
+      "occurred_at": "2026-10-29T14:00:00Z",
+      "thread_id": "t-terms-10",
+      "summary": "Partnership terms: signed copy attached, we're good to go",
+      "from": "Grace Mensah <grace@tidewater.org>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "grace_new",
+      "status": {
+        "no_reply": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

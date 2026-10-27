@@ -1,0 +1,72 @@
+{
+  "id": "h01",
+  "title": "Kenji writes about something else first (no change), then replies in the spec thread: the claim and its reminder go OUT.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T09:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Kenji at Orbit about the integration spec.",
+      "kind": "status",
+      "valid_from": "2026-10-27T09:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-27T09:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "kenji@orbit.dev",
+            "thread_id": "t-spec-21"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "remind",
+      "text": "Remind Kenji about the spec on Monday.",
+      "kind": "next_step",
+      "valid_from": "2026-10-27T09:00:00Z",
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "no_reply"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "kenji_other",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T10:00:00Z",
+      "thread_id": "t-orbit-hr",
+      "summary": "Holiday schedule for November",
+      "from": "Kenji Sato <kenji@orbit.dev>"
+    },
+    {
+      "key": "kenji_spec",
+      "kind": "email_received",
+      "occurred_at": "2026-10-29T11:00:00Z",
+      "thread_id": "t-spec-21",
+      "summary": "Re: Integration spec: looks good, two small comments inline",
+      "from": "Kenji Sato <kenji@orbit.dev>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "kenji_other",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "kenji_spec",
+      "status": {
+        "no_reply": "OUT",
+        "remind": "OUT"
+      },
+      "chain": [
+        "remind"
+      ]
+    }
+  ]
+}

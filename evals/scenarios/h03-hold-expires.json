@@ -1,0 +1,63 @@
+{
+  "id": "h03",
+  "title": "A held appointment slot expires Nov 2 at 5 PM ET (EST after the clocks change); the claim and the plan to confirm go OUT only after.",
+  "split": "heldout",
+  "recorded_at": "2026-10-28T09:00:00Z",
+  "claims": [
+    {
+      "temp_id": "slot_held",
+      "text": "The visa appointment slot is held until Nov 2 at 5 PM ET.",
+      "kind": "status",
+      "valid_from": "2026-10-28T09:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-02T22:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "confirm",
+      "text": "Confirm the visa appointment before the hold ends.",
+      "kind": "next_step",
+      "valid_from": "2026-10-28T09:00:00Z",
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "slot_held"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "tick_before",
+      "kind": "clock",
+      "occurred_at": "2026-11-02T21:59:00Z",
+      "summary": "tick"
+    },
+    {
+      "key": "tick_after",
+      "kind": "clock",
+      "occurred_at": "2026-11-02T22:01:00Z",
+      "summary": "tick"
+    }
+  ],
+  "expected": [
+    {
+      "after": "tick_before",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "tick_after",
+      "status": {
+        "slot_held": "OUT",
+        "confirm": "OUT"
+      },
+      "chain": [
+        "confirm"
+      ]
+    }
+  ]
+}

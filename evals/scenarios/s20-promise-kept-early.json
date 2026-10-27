@@ -1,0 +1,39 @@
+{
+  "id": "s20",
+  "title": "Promise kept early: 'Matt will send the deck by Friday' is not broken by any pattern, but Matt's email with the deck on Wednesday sends it to REVIEW.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T09:00:00Z",
+  "claims": [
+    {
+      "temp_id": "deck_by_friday",
+      "text": "Matt Okafor will send the final pitch deck by Friday.",
+      "kind": "next_step",
+      "valid_from": "2026-10-26T09:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-10-31T04:00:00Z"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "deck_sent",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T16:00:00Z",
+      "thread_id": "t-deck-3",
+      "summary": "Pitch deck: final version attached, ready for Friday",
+      "from": "Matt Okafor <matt@newco.io>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "deck_sent",
+      "status": {
+        "deck_by_friday": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

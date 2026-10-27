@@ -1,0 +1,56 @@
+{
+  "id": "s07",
+  "title": "Doc edit removes a decision: the updated doc contradicts the hosting decision and the deploy plan, both go to REVIEW. The unrelated open question stays IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T14:00:00Z",
+  "texts": [
+    {
+      "key": "doc_v1",
+      "at": "2026-10-25T14:00:00Z",
+      "source": {
+        "kind": "doc",
+        "external_id": "doc-launch",
+        "title": "Launch plan"
+      },
+      "text": "Launch plan\n\nDecision: we host the API on Railway.\nNext step: Dana deploys the API to Railway on Friday, Oct 30.\nOpen question: do we need a separate staging environment?"
+    },
+    {
+      "key": "doc_v2",
+      "at": "2026-10-27T10:00:00Z",
+      "source": {
+        "kind": "doc",
+        "external_id": "doc-launch",
+        "title": "Launch plan"
+      },
+      "text": "Launch plan (updated Oct 27)\n\nDecision: after Sunday's outage we moved hosting from Railway to Fly.io.\nNext step: Dana deploys the API to Fly.io on Friday, Oct 30.\nOpen question: do we need a separate staging environment?"
+    }
+  ],
+  "find": {
+    "host_railway": [
+      "host",
+      "railway"
+    ],
+    "deploy_railway": [
+      "dana",
+      "railway"
+    ],
+    "staging": [
+      "staging"
+    ]
+  },
+  "expected": [
+    {
+      "after": "doc_v1",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "doc_v2",
+      "status": {
+        "host_railway": "REVIEW",
+        "deploy_railway": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

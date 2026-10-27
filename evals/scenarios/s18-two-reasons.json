@@ -1,0 +1,88 @@
+{
+  "id": "s18",
+  "title": "Two reasons: 'ship the beta Friday' holds while Lee hasn't flagged the design AND until Friday ends; Friday passing takes it and its dependent OUT while the design claim stays IN; Lee's email later takes the design claim OUT.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T10:00:00Z",
+  "claims": [
+    {
+      "temp_id": "design_ok",
+      "text": "Lee hasn't flagged any problems with the beta design.",
+      "kind": "status",
+      "valid_from": "2026-10-26T10:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-26T10:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "lee.park@studio.dev",
+            "thread_id": "t-design-8"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "ship_friday",
+      "text": "Ship the beta on Friday, Oct 30.",
+      "kind": "next_step",
+      "valid_from": "2026-10-26T10:00:00Z",
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "design_ok"
+        },
+        {
+          "type": "until",
+          "at": "2026-10-31T04:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "tweet",
+      "text": "Schedule the launch tweet for Friday.",
+      "kind": "next_step",
+      "valid_from": "2026-10-26T10:00:00Z",
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "ship_friday"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "friday_over",
+      "kind": "clock",
+      "occurred_at": "2026-10-31T04:01:00Z",
+      "summary": "tick"
+    },
+    {
+      "key": "lee_flags",
+      "kind": "email_received",
+      "occurred_at": "2026-11-01T12:00:00Z",
+      "thread_id": "t-design-8",
+      "summary": "Re: Beta design: the onboarding flow breaks on mobile",
+      "from": "Lee Park <lee.park@studio.dev>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "friday_over",
+      "status": {
+        "ship_friday": "OUT",
+        "tweet": "OUT"
+      },
+      "chain": [
+        "tweet"
+      ]
+    },
+    {
+      "after": "lee_flags",
+      "status": {
+        "design_ok": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "id": "h07",
+  "title": "End to end: a session note waits on Ines for the data export and plans a ping Monday; her reply in the known thread knocks down both.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T17:00:00Z",
+  "texts": [
+    {
+      "key": "session",
+      "at": "2026-10-27T17:00:00Z",
+      "source": {
+        "kind": "cursor",
+        "external_id": "cur-7",
+        "title": "Cursor session"
+      },
+      "text": "Blocked on the dashboard until Ines at Vela sends the data export she promised. If there's nothing by Monday I'll ping her. Meanwhile I'll stub the charts with fake data."
+    }
+  ],
+  "find": {
+    "waiting_ines": [
+      "ines"
+    ],
+    "ping": [
+      "ping"
+    ],
+    "stub": [
+      "stub"
+    ]
+  },
+  "events": [
+    {
+      "key": "ines_ack",
+      "kind": "email_received",
+      "occurred_at": "2026-10-26T10:00:00Z",
+      "thread_id": "t-export-6",
+      "summary": "Data export: request received, I'll run it this week",
+      "from": "Ines Duarte <ines@vela.health>"
+    },
+    {
+      "key": "ines_done",
+      "kind": "email_received",
+      "occurred_at": "2026-10-29T15:00:00Z",
+      "thread_id": "t-export-6",
+      "summary": "Re: Data export: done, the files are in the shared bucket",
+      "from": "Ines Duarte <ines@vela.health>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "session",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "ines_done",
+      "status": {
+        "waiting_ines": "OUT",
+        "ping": "OUT"
+      },
+      "chain": [
+        "ping"
+      ]
+    }
+  ]
+}

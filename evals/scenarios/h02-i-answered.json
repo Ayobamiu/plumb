@@ -1,0 +1,55 @@
+{
+  "id": "h02",
+  "title": "'I need to answer Fatima's invoice question' survives her follow-up email and goes OUT only when Usman sends the answer.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T09:00:00Z",
+  "claims": [
+    {
+      "temp_id": "must_answer",
+      "text": "I need to answer Fatima's question about invoice #204.",
+      "kind": "next_step",
+      "valid_from": "2026-10-27T09:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-27T09:00:00Z",
+          "pattern": {
+            "event_kind": "email_sent",
+            "thread_id": "t-inv-204"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "fatima_followup",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T09:00:00Z",
+      "thread_id": "t-inv-204",
+      "summary": "Re: Invoice #204: any update?",
+      "from": "Fatima Rahman <fatima@ledgerly.co>"
+    },
+    {
+      "key": "usman_answers",
+      "kind": "email_sent",
+      "occurred_at": "2026-10-28T12:00:00Z",
+      "thread_id": "t-inv-204",
+      "summary": "Re: Invoice #204: paid on Oct 20, receipt attached"
+    }
+  ],
+  "expected": [
+    {
+      "after": "fatima_followup",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "usman_answers",
+      "status": {
+        "must_answer": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "id": "s15",
+  "title": "End to end deadline: early-bird pricing ends Oct 30 at noon ET; the claim and the plan to register before then go OUT on the first clock tick after noon, not before.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T12:00:00Z",
+  "texts": [
+    {
+      "key": "notes",
+      "at": "2026-10-26T12:00:00Z",
+      "source": {
+        "kind": "doc",
+        "external_id": "doc-notes",
+        "title": "Notes"
+      },
+      "text": "Early-bird pricing for the AI Builders Summit ends Oct 30 at noon ET. We should register Priya and me before then."
+    }
+  ],
+  "find": {
+    "early_bird": [
+      "early"
+    ],
+    "register": [
+      "register"
+    ]
+  },
+  "events": [
+    {
+      "key": "before_noon",
+      "kind": "clock",
+      "occurred_at": "2026-10-30T15:30:00Z",
+      "summary": "tick"
+    },
+    {
+      "key": "after_noon",
+      "kind": "clock",
+      "occurred_at": "2026-10-30T16:30:00Z",
+      "summary": "tick"
+    }
+  ],
+  "expected": [
+    {
+      "after": "notes",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "before_noon",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "after_noon",
+      "status": {
+        "early_bird": "OUT",
+        "register": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

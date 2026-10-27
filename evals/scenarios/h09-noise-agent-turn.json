@@ -1,0 +1,48 @@
+{
+  "id": "h09",
+  "title": "Noise: an agent turn with bookkeeping (lint counts, file paths, a PR number) around one decision and one next step. Measures extra claims; all stay IN.",
+  "split": "heldout",
+  "recorded_at": "2026-10-28T20:00:00Z",
+  "texts": [
+    {
+      "key": "agent_turn",
+      "at": "2026-10-28T20:00:00Z",
+      "source": {
+        "kind": "cursor",
+        "external_id": "cur-9",
+        "title": "Cursor turn"
+      },
+      "text": "Ran lint: 0 errors, 3 warnings in apps/web/components/Feed.tsx. Opened PR #41 and pushed 4 commits. Updated the README table.\n\nDecision: the feed polls every 5 seconds instead of using realtime.\nNext: Claude Code adds an index on transitions.at."
+    }
+  ],
+  "find": {
+    "polling": [
+      "poll"
+    ],
+    "index_next": [
+      "index"
+    ]
+  },
+  "events": [
+    {
+      "key": "unrelated",
+      "kind": "email_received",
+      "occurred_at": "2026-10-29T08:00:00Z",
+      "thread_id": "t-bill-1",
+      "summary": "Your October invoice",
+      "from": "billing@example.com"
+    }
+  ],
+  "expected": [
+    {
+      "after": "agent_turn",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "unrelated",
+      "status": {},
+      "chain": []
+    }
+  ]
+}

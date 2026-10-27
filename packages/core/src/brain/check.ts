@@ -9,7 +9,7 @@ import { explainModelCheck } from "./explain.js";
 import { loadPrompt, type JsonModel } from "./extract.js";
 import { normalizeAddress, type BrainState } from "./invalidate.js";
 
-export const CHECK_PROMPT = "check.v1";
+export const CHECK_PROMPT = "check.v2";
 const MAX_CANDIDATES = 8;
 const PARALLEL = 4;
 const QUOTE_MAX = 200;
@@ -49,8 +49,11 @@ export function selectCandidates(state: BrainState, event: Event, max = MAX_CAND
   const eventWords = words(event.summary);
 
   const out: Candidate[] = [];
+  const eventAt = Date.parse(event.occurred_at);
   for (const claim of state.claims.values()) {
     if (claim.status !== "IN") continue;
+    // The claim was written knowing about anything before it: a late-seen old email is not news.
+    if (eventAt <= Date.parse(claim.valid_from)) continue;
     const signals: string[] = [];
     let score = 0;
     const hints: string[] = [];

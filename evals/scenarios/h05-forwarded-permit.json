@@ -1,0 +1,44 @@
+{
+  "id": "h05",
+  "title": "A colleague forwards the city's permit approval: different sender and thread, so the model check sends 'waiting on the permit' to REVIEW.",
+  "split": "heldout",
+  "recorded_at": "2026-10-26T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "permit_pending",
+      "text": "Still waiting for the city's decision on the event permit.",
+      "kind": "status",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-26T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "permits@cityofbrook.gov",
+            "thread_id": "t-permit-3"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "fwd",
+      "kind": "email_received",
+      "occurred_at": "2026-10-29T09:00:00Z",
+      "thread_id": "t-fwd-77",
+      "summary": "Fwd: Event permit: your event permit application has been approved",
+      "from": "Theo Grant <theo@ourteam.io>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "fwd",
+      "status": {
+        "permit_pending": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

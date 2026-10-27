@@ -1,0 +1,42 @@
+{
+  "id": "h06",
+  "title": "Omar writes about lunch in a new thread: nothing about the contractor, so the claim stays IN with no REVIEW.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T09:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Omar about hiring the contractor.",
+      "kind": "status",
+      "valid_from": "2026-10-27T09:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-27T09:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "omar@buildright.io",
+            "thread_id": "t-hire-4"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "omar_lunch",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T12:00:00Z",
+      "thread_id": "t-lunch-2",
+      "summary": "Team lunch Thursday? I'll book the usual place",
+      "from": "Omar Haddad <omar@buildright.io>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "omar_lunch",
+      "status": {},
+      "chain": []
+    }
+  ]
+}

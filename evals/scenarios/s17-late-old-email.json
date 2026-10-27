@@ -1,0 +1,57 @@
+{
+  "id": "s17",
+  "title": "Late-seen old email: Sam's message from before the claim was written arrives late and must not break it (neither code nor model check); his later reply does.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Sam about the revised quote.",
+      "kind": "status",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-26T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "sam.ortiz@fabworks.com",
+            "thread_id": "t-quote-5"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "old_email",
+      "kind": "email_received",
+      "occurred_at": "2026-10-26T09:00:00Z",
+      "thread_id": "t-quote-5",
+      "summary": "Re: Quote: revised quote coming later this week",
+      "from": "Sam Ortiz <sam.ortiz@fabworks.com>"
+    },
+    {
+      "key": "new_reply",
+      "kind": "email_received",
+      "occurred_at": "2026-10-27T15:00:00Z",
+      "thread_id": "t-quote-5",
+      "summary": "Re: Quote: revised quote attached",
+      "from": "sam.ortiz@fabworks.com"
+    }
+  ],
+  "expected": [
+    {
+      "after": "old_email",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "new_reply",
+      "status": {
+        "no_reply": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

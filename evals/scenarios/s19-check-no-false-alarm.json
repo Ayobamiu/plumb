@@ -1,0 +1,58 @@
+{
+  "id": "s19",
+  "title": "Model check, no false alarm: a newsletter names Avery and Northfield's pilot; it says nothing about the LOI or the pilot start, so both claims stay IN with no REVIEW.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Avery Hart about the LOI yet.",
+      "kind": "status",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-25T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "avery.hart@northfield.edu",
+            "thread_id": "t-loi-101"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "pilot_jan",
+      "text": "The Northfield pilot starts in January.",
+      "kind": "fact",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-25T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "text_hint": "Northfield pilot start date moved"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "newsletter",
+      "kind": "email_received",
+      "occurred_at": "2026-10-27T07:00:00Z",
+      "thread_id": "t-edw-44",
+      "summary": "This week: Avery Hart of Northfield speaks at EdTech Summit about how districts run pilot programs.",
+      "from": "EdTech Weekly <news@edtechweekly.io>"
+    }
+  ],
+  "expected": [
+    {
+      "after": "newsletter",
+      "status": {},
+      "chain": []
+    }
+  ]
+}

@@ -73,6 +73,11 @@ describe("selectCandidates", () => {
     expect(got.map((x) => x.claim.id)).toEqual([id("venue")]);
   });
 
+  it("skips an event older than the claim, even if it is seen late", () => {
+    const old = { ...email("Matt Jones <matt@new-co.com>", "Contract: signed copy attached"), occurred_at: "2026-10-24T10:00:00Z" };
+    expect(selectCandidates(s, old)).toEqual([]);
+  });
+
   it("skips unrelated email, clock ticks, and claims that are not IN", () => {
     expect(selectCandidates(s, email("news@example.com", "Weekly newsletter"))).toEqual([]);
     expect(selectCandidates(s, { ...email("matt@new-co.com", "x"), kind: "clock" })).toEqual([]);

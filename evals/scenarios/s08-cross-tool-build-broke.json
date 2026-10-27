@@ -1,0 +1,55 @@
+{
+  "id": "s08",
+  "title": "Cross-tool: Claude Code says the tests pass and Cursor should wire the login page; a later Cursor session says the login page is merged and the build broke. Both go to REVIEW.",
+  "split": "dev",
+  "recorded_at": "2026-10-26T15:00:00Z",
+  "texts": [
+    {
+      "key": "cc_session",
+      "at": "2026-10-26T15:00:00Z",
+      "source": {
+        "kind": "claude_code",
+        "external_id": "cc-1",
+        "title": "Claude Code session"
+      },
+      "text": "Finished the auth middleware. All 48 tests pass on main.\nNext: Cursor wires the login page to the new middleware."
+    },
+    {
+      "key": "cursor_session",
+      "at": "2026-10-26T19:00:00Z",
+      "source": {
+        "kind": "cursor",
+        "external_id": "cur-1",
+        "title": "Cursor session"
+      },
+      "text": "Merged the login page into main. The build on main is broken now: 3 auth tests fail because AUTH_SECRET is missing in CI. I'll fix it tomorrow morning."
+    }
+  ],
+  "find": {
+    "tests_pass": [
+      "tests",
+      "pass"
+    ],
+    "login_next": [
+      "login"
+    ],
+    "build_broken": [
+      "build"
+    ]
+  },
+  "expected": [
+    {
+      "after": "cc_session",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "cursor_session",
+      "status": {
+        "tests_pass": "REVIEW",
+        "login_next": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

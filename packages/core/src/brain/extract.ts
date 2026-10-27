@@ -6,14 +6,16 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { ClaimKind, type AbsencePattern, type Claim, type SourceKind } from "../contract.js";
+import { ClaimKind, type AbsencePattern, type Claim, type Event, type SourceKind } from "../contract.js";
 import { MUSE_SPARK, type JsonCallOptions } from "../meta/client.js";
 import type { NewClaim, NewReason } from "../tools.js";
 import { normalizeAddress } from "./invalidate.js";
 
-export const EXTRACT_PROMPT = "extract.v1";
+export const EXTRACT_PROMPT = "extract.v2";
 const MAX_CLAIMS = 20;
 const QUOTE_MAX = 200;
+const MAX_THREADS = 50;
+const SUBJECT_MAX = 120;
 
 /** What extraction needs from a model client. MetaClient fits; tests pass a fake. */
 export interface JsonModel {
@@ -50,6 +52,30 @@ export interface ExtractResult {
   contradicts: Contradiction[];
   dropped: Dropped[];
   extracted_by: string; // model id plus prompt version
+}
+
+/** Email threads seen recently, newest first, with who wrote in each. */
+export function knownThreads(events: Event[]): KnownThread[] {
+  const byThread = new Map<string, { thread: KnownThread; last: number }>();
+  for (const e of events) {
+    if (!e.thread_id) continue;
+    const at = Date.parse(e.occurred_at);
+    const entry = byThread.get(e.thread_id) ?? { thread: { thread_id: e.thread_id, subject: "", participants: [] }, last: 0 };
+    if (at >= entry.last) {
+      entry.last = at;
+      entry.thread.subject = e.summary.slice(0, SUBJECT_MAX);
+    }
+    // Sent mail is from Usman; the model never needs his address in a pattern.
+    if (e.kind === "email_received" && e.from) {
+      const from = normalizeAddress(e.from);
+      if (!entry.thread.participants.includes(from)) entry.thread.participants.push(from);
+    }
+    byThread.set(e.thread_id, entry);
+  }
+  return [...byThread.values()]
+    .sort((a, b) => b.last - a.last)
+    .slice(0, MAX_THREADS)
+    .map((x) => x.thread);
 }
 
 // ---- What the model returns. Flat and nullable, as strict JSON schema needs.

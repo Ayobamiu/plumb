@@ -1,0 +1,86 @@
+{
+  "id": "h10",
+  "title": "Usman confirms a claim OUT (its follow-up falls too), then changes his mind and restores it: both come back IN.",
+  "split": "heldout",
+  "recorded_at": "2026-10-27T09:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Nadia about the venue contract.",
+      "kind": "status",
+      "valid_from": "2026-10-27T09:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-27T09:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "nadia@harborhall.com",
+            "thread_id": "t-venue-12"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "follow_up",
+      "text": "Follow up with Nadia on Wednesday.",
+      "kind": "next_step",
+      "valid_from": "2026-10-27T09:00:00Z",
+      "reasons": [
+        {
+          "type": "depends_on",
+          "claim": "no_reply"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "unrelated",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T08:00:00Z",
+      "thread_id": "t-news-9",
+      "summary": "Weekly digest",
+      "from": "news@example.com"
+    }
+  ],
+  "actions": [
+    {
+      "key": "confirm",
+      "at": "2026-10-28T10:00:00Z",
+      "action": "confirm_out",
+      "claim": "no_reply"
+    },
+    {
+      "key": "restore",
+      "at": "2026-10-28T11:00:00Z",
+      "action": "restore_in",
+      "claim": "no_reply"
+    }
+  ],
+  "expected": [
+    {
+      "after": "unrelated",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "confirm",
+      "status": {
+        "no_reply": "OUT",
+        "follow_up": "OUT"
+      },
+      "chain": [
+        "follow_up"
+      ]
+    },
+    {
+      "after": "restore",
+      "status": {
+        "no_reply": "IN",
+        "follow_up": "IN"
+      },
+      "chain": []
+    }
+  ]
+}
