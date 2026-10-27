@@ -29,8 +29,10 @@ export const ScenarioText = z.object({
 export const ScenarioAction = z.object({
   key: z.string(),
   at: Timestamp,
-  action: z.enum(["confirm_out", "restore_in"]),
-  claim: z.string(), // claim key
+  // accept_links: Usman accepts the link suggestions listed in expect_links
+  // (he'd dismiss the rest), so a wrong suggestion never changes a status.
+  action: z.enum(["confirm_out", "restore_in", "accept_links"]),
+  claim: z.string().optional(), // claim key, for confirm_out and restore_in
 });
 
 export const ScenarioSweep = z.object({ key: z.string(), at: Timestamp });
@@ -56,6 +58,8 @@ export const Scenario = z
     events: z.array(ScenarioEvent).default([]),
     actions: z.array(ScenarioAction).default([]),
     sweeps: z.array(ScenarioSweep).default([]),
+    // [claim key, key of the claim it should rest on]: links the sweep should suggest
+    expect_links: z.array(z.tuple([z.string(), z.string()])).default([]),
     expected: z.array(Checkpoint).min(1),
   })
   .superRefine((s, ctx) => {
@@ -65,7 +69,12 @@ export const Scenario = z
       ctx.addIssue({ code: "custom", message: "find needs texts" });
     }
     for (const a of s.actions) {
-      if (!claimKeys.has(a.claim)) ctx.addIssue({ code: "custom", message: `action ${a.key}: unknown claim key ${a.claim}` });
+      if (a.action !== "accept_links" && !(a.claim && claimKeys.has(a.claim))) {
+        ctx.addIssue({ code: "custom", message: `action ${a.key}: unknown claim key ${a.claim}` });
+      }
+    }
+    for (const [a, b] of s.expect_links) {
+      if (!claimKeys.has(a) || !claimKeys.has(b)) ctx.addIssue({ code: "custom", message: `expect_links: unknown claim key in ${a}, ${b}` });
     }
     for (const cp of s.expected) {
       if (!stepKeys.has(cp.after)) ctx.addIssue({ code: "custom", message: `unknown step key ${cp.after}` });

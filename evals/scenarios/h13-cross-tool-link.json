@@ -1,0 +1,111 @@
+{
+  "id": "h13",
+  "title": "Cross-tool chain needs a link (held-out): the plan to announce the partnership rests on Tidewater still being on track to sign. Once accepted, Tidewater legal's email knocks down both. Flights and booth size are not links.",
+  "split": "heldout",
+  "recorded_at": "2026-10-28T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "on_track",
+      "text": "Tidewater is still on track to sign the partnership agreement.",
+      "kind": "status",
+      "valid_from": "2026-10-27T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-27T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "legal@tidewater.org"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "announce",
+      "text": "Announce the Tidewater partnership on stage at the Nov 12 conference.",
+      "kind": "next_step",
+      "valid_from": "2026-10-28T09:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-13T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "flights",
+      "text": "Book flights to the Nov 12 conference.",
+      "kind": "next_step",
+      "valid_from": "2026-10-28T09:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-05T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "booth",
+      "text": "Our conference booth is 3 by 3 meters.",
+      "kind": "fact",
+      "valid_from": "2026-10-28T09:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-13T05:00:00Z"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "legal",
+      "kind": "email_received",
+      "occurred_at": "2026-10-30T15:00:00Z",
+      "from": "Tidewater Legal <legal@tidewater.org>",
+      "thread_id": "t-tw-legal",
+      "summary": "Partnership agreement: we can't sign in its current form"
+    }
+  ],
+  "actions": [
+    {
+      "key": "accept",
+      "at": "2026-10-29T13:00:00Z",
+      "action": "accept_links"
+    }
+  ],
+  "sweeps": [
+    {
+      "key": "sweep",
+      "at": "2026-10-29T12:00:00Z"
+    }
+  ],
+  "expect_links": [
+    [
+      "announce",
+      "on_track"
+    ]
+  ],
+  "expected": [
+    {
+      "after": "sweep",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "accept",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "legal",
+      "status": {
+        "on_track": "OUT",
+        "announce": "OUT"
+      },
+      "chain": [
+        "announce"
+      ]
+    }
+  ]
+}

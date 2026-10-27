@@ -1,0 +1,111 @@
+{
+  "id": "s23",
+  "title": "Cross-tool chain needs a link nobody wrote: Claude Code says tests pass, Cursor plans the Friday deploy. The sweep should suggest 'deploy rests on tests' (and nothing for the blog post or the office). Once Usman accepts it, a CI failure knocks down both.",
+  "split": "dev",
+  "recorded_at": "2026-10-27T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "tests",
+      "text": "All tests pass on main.",
+      "kind": "status",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-26T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "from": "ci@builds.ourteam.io"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "deploy",
+      "text": "Deploy the release to production on Friday.",
+      "kind": "next_step",
+      "valid_from": "2026-10-27T10:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-10-31T04:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "blog",
+      "text": "Write the launch blog post this week.",
+      "kind": "next_step",
+      "valid_from": "2026-10-27T10:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-01T04:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "office",
+      "text": "The office is closed on Monday for the holiday.",
+      "kind": "fact",
+      "valid_from": "2026-10-27T10:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-03T05:00:00Z"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "ci_fail",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T09:00:00Z",
+      "from": "CI <ci@builds.ourteam.io>",
+      "thread_id": "t-ci-482",
+      "summary": "Build #482 failed on main: 3 tests failing"
+    }
+  ],
+  "actions": [
+    {
+      "key": "accept",
+      "at": "2026-10-27T19:00:00Z",
+      "action": "accept_links"
+    }
+  ],
+  "sweeps": [
+    {
+      "key": "sweep",
+      "at": "2026-10-27T18:00:00Z"
+    }
+  ],
+  "expect_links": [
+    [
+      "deploy",
+      "tests"
+    ]
+  ],
+  "expected": [
+    {
+      "after": "sweep",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "accept",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "ci_fail",
+      "status": {
+        "tests": "OUT",
+        "deploy": "OUT"
+      },
+      "chain": [
+        "deploy"
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 // brain write goes through the plumb_apply function so it lands in one
 // transaction (supabase/migrations/20261026000002_vault_and_apply.sql).
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Claim, Event, Project, Reason, Source, Transition } from "@plumb/core";
+import type { Claim, Event, LinkSuggestionRow, Project, Reason, Source, Transition } from "@plumb/core";
 import {
   ConflictError,
   type BrainWrite,
@@ -139,6 +139,32 @@ export class SupabaseStore implements Store {
       return q.order("id").range(a, b);
     });
     return rows.map(toEvent);
+  }
+
+  async loadLinkSuggestions(filter: { project_id?: string; status?: LinkSuggestionRow["status"] } = {}) {
+    if (filter.project_id && !UUID.test(filter.project_id)) return [];
+    const rows = await pages((a, b) => {
+      let q = this.db.from("link_suggestions").select("*");
+      if (filter.project_id) q = q.eq("project_id", filter.project_id);
+      if (filter.status) q = q.eq("status", filter.status);
+      return q.order("created_at", { ascending: false }).order("id").range(a, b);
+    });
+    return rows.map((r) => clean(r) as unknown as LinkSuggestionRow);
+  }
+
+  async addLinkSuggestions(rows: Omit<LinkSuggestionRow, "id" | "status" | "created_at" | "resolved_at">[]) {
+    if (rows.length === 0) return;
+    // A pair suggested before (in any status) is skipped, not an error.
+    const { error } = await this.db.from("link_suggestions").upsert(rows, { onConflict: "claim_id,depends_on", ignoreDuplicates: true });
+    if (error) throw new Error(`supabase: ${error.message}`);
+  }
+
+  async resolveLinkSuggestion(id: string, status: "accepted" | "dismissed", at: string) {
+    if (!UUID.test(id)) return false;
+    const rows = check(
+      await this.db.from("link_suggestions").update({ status, resolved_at: at }).eq("id", id).eq("status", "pending").select("id"),
+    );
+    return rows.length === 1;
   }
 
   async getCursor(name: string) {

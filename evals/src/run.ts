@@ -27,6 +27,8 @@ interface Tally {
   found: [number, number]; // [claims extraction produced, claims the texts state]
   extra: [number, number]; // [extracted claims no key asked for, texts]
   extras: string[]; // their text, to judge noise by reading
+  links: [number, number]; // [expected links suggested, links expected]
+  wrongLinks: string[];
   flagMs: number[];
   scenariosPassed: number;
   scenarios: number;
@@ -43,6 +45,8 @@ const empty = (): Tally => ({
   found: [0, 0],
   extra: [0, 0],
   extras: [],
+  links: [0, 0],
+  wrongLinks: [],
   flagMs: [],
   scenariosPassed: 0,
   scenarios: 0,
@@ -111,6 +115,11 @@ function score(s: Scenario, run: SystemRun, t: Tally) {
     t.extra[1] += run.extraction.texts;
     t.extras.push(...run.extraction.extras.map((x) => `${s.id}: ${x}`));
   }
+  if (run.links) {
+    t.links[0] += run.links.right;
+    t.links[1] += run.links.expected;
+    t.wrongLinks.push(...run.links.wrong.map((w) => `${s.id}: ${w}`));
+  }
   t.flagMs.push(...run.flagMs);
   if (passed) t.scenariosPassed++;
 }
@@ -157,6 +166,9 @@ for (const [name, system] of Object.entries(all)) {
   if (t.found[1] > 0) {
     console.log(`  extraction found      ${pct(t.found)}`);
     console.log(`  extra claims per text ${(t.extra[0] / t.extra[1]).toFixed(1)} (${t.extra[0]} over ${t.extra[1]} texts)`);
+  }
+  if (t.links[1] > 0 || t.wrongLinks.length > 0) {
+    console.log(`  links suggested       ${pct(t.links)} right, ${t.wrongLinks.length} wrong${t.wrongLinks.length ? ` (${t.wrongLinks.join("; ")})` : ""}`);
   }
   if (verbose || name.startsWith("plumb")) t.failures.forEach((f) => console.log(`  FAIL ${f}`));
   if (verbose) t.extras.forEach((x) => console.log(`  EXTRA ${x}`));

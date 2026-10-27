@@ -17,6 +17,7 @@ import {
   onEvent,
   recheckClaims,
   restore,
+  suggestLinks,
   selectCandidates,
   sendToReview,
   type BrainState,
@@ -33,6 +34,7 @@ export interface SystemRun {
   statusAfter: Map<string, Map<string, KeyStatus>>; // step key -> claim key -> status
   flagMs: number[]; // wall-clock time of each step that flagged a claim
   extraction?: { found: number; keys: number; extracted: number; texts: number; extras: string[] };
+  links?: { expected: number; right: number; wrong: string[] }; // link suggestions vs expect_links
 }
 
 type System = (s: Scenario) => Promise<SystemRun | null>;
@@ -79,6 +81,10 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
   const extractedIds: string[] = [];
   let eventIndex = 0;
   let lastSweepAt = -Infinity;
+  const keyOf = (id: string) => [...keyToId].find(([, v]) => v === id)?.[0] ?? "(unkeyed claim)";
+  const knownLinks = new Set<string>();
+  const suggested: { claim_id: string; depends_on: string; accepted: boolean }[] = [];
+  const expectedLinks = new Set(s.expect_links.map(([a, b]) => `${a}>${b}`));
 
   for (const step of timeline(s)) {
     const before = statusOf();
@@ -141,10 +147,19 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
           done.add(f.claim_id);
           sendToReview(state, f.claim_id, ctx, { explanation: f.explanation, ...(f.event_id && { event_id: f.event_id }) });
         }
+        // Links are suggested after this sweep's REVIEWs, as in production.
+        for (const l of await suggestLinks(model, state, knownLinks)) suggested.push({ ...l, accepted: false });
         lastSweepAt = at;
       }
+    } else if (step.action.action === "accept_links") {
+      for (const l of suggested) {
+        if (l.accepted || !expectedLinks.has(`${keyOf(l.claim_id)}>${keyOf(l.depends_on)}`)) continue;
+        l.accepted = true;
+        state.reasons.push({ id: randomUUID(), claim_id: l.claim_id, type: "depends_on", claim: l.depends_on });
+        evaluateClaims(state, [l.claim_id], ctx);
+      }
     } else {
-      const id = keyToId.get(step.action.claim);
+      const id = keyToId.get(step.action.claim!);
       if (id) {
         if (step.action.action === "confirm_out") confirmOut(state, id, ctx);
         else restore(state, id, ctx);
@@ -159,6 +174,14 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
   }
 
   const run: SystemRun = { statusAfter, flagMs };
+  if (s.expect_links.length > 0 || suggested.length > 0) {
+    const made = suggested.map((l) => `${keyOf(l.claim_id)}>${keyOf(l.depends_on)}`);
+    run.links = {
+      expected: expectedLinks.size,
+      right: [...expectedLinks].filter((k) => made.includes(k)).length,
+      wrong: made.filter((k) => !expectedLinks.has(k)),
+    };
+  }
   if (s.texts.length > 0) {
     const findKeys = Object.keys(s.find);
     const keyed = new Set(keyToId.values());

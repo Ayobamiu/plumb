@@ -1,6 +1,6 @@
 // What the tool handlers need from storage. SupabaseStore is the real one;
 // MemoryStore backs the tests. Handlers never talk to Supabase directly.
-import type { Claim, ClaimStatus, Event, EventKind, Project, Reason, Source, Transition } from "@plumb/core";
+import type { Claim, ClaimStatus, Event, EventKind, LinkSuggestionRow, Project, Reason, Source, Transition } from "@plumb/core";
 
 export type ProjectWithCounts = Project & { counts: Record<ClaimStatus, number> };
 
@@ -55,6 +55,11 @@ export interface Store {
   /** A named place marker in watcher_cursors (e.g. "sweep"), or undefined if never set. */
   getCursor(name: string): Promise<string | undefined>;
   setCursor(name: string, value: string): Promise<void>;
+  /** Link suggestions from the sweep (link_suggestions), newest first. */
+  loadLinkSuggestions(filter?: { project_id?: string; status?: LinkSuggestionRow["status"] }): Promise<LinkSuggestionRow[]>;
+  addLinkSuggestions(rows: Omit<LinkSuggestionRow, "id" | "status" | "created_at" | "resolved_at">[]): Promise<void>;
+  /** Move a pending suggestion to accepted or dismissed. False if it wasn't pending. */
+  resolveLinkSuggestion(id: string, status: "accepted" | "dismissed", at: string): Promise<boolean>;
   /** Throws ConflictError if a claim's status is no longer expected_status. */
   apply(write: BrainWrite): Promise<void>;
 }

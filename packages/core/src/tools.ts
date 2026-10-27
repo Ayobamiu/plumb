@@ -127,3 +127,27 @@ export const IngestOutput = RecordClaimsOutput.extend({
   dropped: z.array(z.object({ text: z.string(), why: z.string() })),
   truncated: z.boolean(), // text was longer than the limit; only the end was read
 });
+
+// Link suggestions (not MCP tools; the homepage lists them, Usman accepts or
+// dismisses). The sleep-time sweep writes them; accepting adds the depends_on
+// reason through record_claims, so the Contract tables are unchanged.
+export const LinkSuggestionStatus = z.enum(["pending", "accepted", "dismissed"]);
+export const LinkSuggestionRow = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  claim_id: z.string(), // would depend on ...
+  depends_on: z.string(), // ... this claim
+  why: z.string(),
+  status: LinkSuggestionStatus,
+  created_at: Timestamp,
+  resolved_at: Timestamp.optional(),
+});
+export type LinkSuggestionRow = z.infer<typeof LinkSuggestionRow>;
+
+export const ListLinkSuggestionsInput = z.object({ project_id: z.string() });
+export const ListLinkSuggestionsOutput = z.object({
+  suggestions: z.array(LinkSuggestionRow.extend({ claim: Claim, depends_on_claim: Claim })), // pending, newest first
+});
+
+export const ResolveLinkSuggestionInput = z.object({ id: z.string(), action: z.enum(["accept", "dismiss"]) });
+export const ResolveLinkSuggestionOutput = z.object({ suggestion: LinkSuggestionRow });

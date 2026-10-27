@@ -44,6 +44,7 @@ describe("sweep", () => {
       async json(opts) {
         users.push(opts.user);
         if (opts.schemaName === "duplicates") return opts.parse.parse({ groups: [] }) as never;
+        if (opts.schemaName === "links") return opts.parse.parse({ depends_on: [] }) as never;
         return opts.parse.parse({ verdict: "unsure", event: 1, quote: "moving the database to Neon", why: "Maybe." }) as never;
       },
     };

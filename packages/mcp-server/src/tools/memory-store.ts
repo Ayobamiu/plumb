@@ -1,7 +1,7 @@
 // In-memory Store for tests. Returns copies, like a database would, so a
 // handler mutating what it loaded never changes stored rows by accident.
 import { randomUUID } from "node:crypto";
-import type { Claim, Event, Project, Reason, Source, Transition } from "@plumb/core";
+import type { Claim, Event, LinkSuggestionRow, Project, Reason, Source, Transition } from "@plumb/core";
 import {
   ConflictError,
   type BrainWrite,
@@ -23,6 +23,7 @@ export class MemoryStore implements Store {
   events: Event[] = [];
   transitions: Transition[] = [];
   cursors = new Map<string, string>();
+  links: LinkSuggestionRow[] = [];
 
   addProject(name: string): Project {
     const project = { id: randomUUID(), name, created_at: new Date().toISOString() };
@@ -85,6 +86,29 @@ export class MemoryStore implements Store {
 
   async setCursor(name: string, value: string) {
     this.cursors.set(name, value);
+  }
+
+  async loadLinkSuggestions(filter: { project_id?: string; status?: LinkSuggestionRow["status"] } = {}) {
+    return this.links
+      .filter((l) => !filter.project_id || l.project_id === filter.project_id)
+      .filter((l) => !filter.status || l.status === filter.status)
+      .reverse()
+      .map(copy);
+  }
+
+  async addLinkSuggestions(rows: Omit<LinkSuggestionRow, "id" | "status" | "created_at" | "resolved_at">[]) {
+    for (const r of rows) {
+      if (this.links.some((l) => l.claim_id === r.claim_id && l.depends_on === r.depends_on)) continue;
+      this.links.push({ ...r, id: randomUUID(), status: "pending", created_at: new Date().toISOString() });
+    }
+  }
+
+  async resolveLinkSuggestion(id: string, status: "accepted" | "dismissed", at: string) {
+    const l = this.links.find((x) => x.id === id);
+    if (!l || l.status !== "pending") return false;
+    l.status = status;
+    l.resolved_at = at;
+    return true;
   }
 
   async loadTransitions(filter: TransitionFilter = {}) {

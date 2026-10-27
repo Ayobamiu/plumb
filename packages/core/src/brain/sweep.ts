@@ -201,3 +201,116 @@ export async function findDuplicates(model: JsonModel, state: BrainState, modelI
   }
   return flags;
 }
+
+// 3. Missing links: depends_on edges nobody wrote down, mostly between claims
+//    from different tools. These are suggestions, never applied silently; they
+//    go to a list for Usman (link_suggestions), not to REVIEW, because REVIEW
+//    means "may no longer be true", which is a different question.
+
+export const LINKS_PROMPT = "sweep-links.v3";
+const MAX_LINKS = 10; // per project per sweep
+const MAX_PLANS = 30; // claims asked about, per project per sweep
+const LINK_KINDS = new Set(["next_step", "decision", "goal"]); // the kinds that usually rest on something
+
+export interface LinkSuggestion {
+  claim_id: string; // would depend on ...
+  depends_on: string; // ... this claim
+  why: string;
+}
+
+const Links = z.object({ depends_on: z.array(z.object({ ref: z.string(), why: z.string() })) });
+const LINKS_SCHEMA = {
+  type: "object",
+  properties: {
+    depends_on: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { ref: { type: "string" }, why: { type: "string" } },
+        required: ["ref", "why"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["depends_on"],
+  additionalProperties: false,
+};
+
+/** Does `from` already rest on `to`, directly or through other links? */
+function restsOn(state: BrainState, from: string, to: string): boolean {
+  const seen = new Set<string>();
+  const stack = [from];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (id === to) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const r of state.reasons) if (r.claim_id === id && r.type === "depends_on") stack.push(r.claim);
+  }
+  return false;
+}
+
+/**
+ * Suggest missing links. One focused question per plan, next step, decision
+ * or goal: which of the project's other IN claims does it assume? (A single
+ * question about the whole project found the right link only about half the
+ * time on dev.) Code drops pairs already linked (directly or through others),
+ * pairs that would make a loop, and pairs suggested before in either
+ * direction (`known`, as "claim>depends_on").
+ */
+export async function suggestLinks(
+  model: JsonModel,
+  state: BrainState,
+  known: Set<string>,
+  modelId = MUSE_SPARK,
+): Promise<LinkSuggestion[]> {
+  const byProject = new Map<string, Claim[]>();
+  for (const c of state.claims.values()) {
+    if (c.status !== "IN") continue;
+    byProject.set(c.project_id, [...(byProject.get(c.project_id) ?? []), c]);
+  }
+  const developer = await loadPrompt(LINKS_PROMPT);
+  const out: LinkSuggestion[] = [];
+  for (const all of byProject.values()) {
+    const claims = [...all].sort(older).slice(-MAX_DUP_CLAIMS);
+    if (claims.length < 2) continue;
+    const refs = new Map(claims.map((c, i) => [`c${i + 1}`, c]));
+    const refOf = new Map(claims.map((c, i) => [c.id, `c${i + 1}`]));
+    const sources = new Map<string, string>();
+    for (const c of claims) if (!sources.has(c.source_id)) sources.set(c.source_id, `S${sources.size + 1}`);
+    const line = (c: Claim) => `${refOf.get(c.id)} [${c.kind}, from ${sources.get(c.source_id)}, written ${c.valid_from}] ${c.text}`;
+    const plans = claims.filter((c) => LINK_KINDS.has(c.kind)).slice(-MAX_PLANS);
+
+    const answers = await inBatches(plans, PARALLEL, async (plan) => {
+      try {
+        const a = await model.json({
+          job: "sweep_links",
+          developer,
+          user: [`Claim to check: ${line(plan)}`, "", "Other current claims:", ...claims.filter((c) => c.id !== plan.id).map(line)].join("\n"),
+          schemaName: "links",
+          jsonSchema: LINKS_SCHEMA,
+          parse: Links,
+          effort: "medium",
+          model: modelId,
+        });
+        return { plan, links: a.depends_on.slice(0, 3) };
+      } catch {
+        return { plan, links: [] };
+      }
+    });
+
+    let added = 0;
+    for (const { plan, links } of answers) {
+      for (const l of links) {
+        const to = refs.get(l.ref);
+        if (!to || to.id === plan.id || added >= MAX_LINKS) continue;
+        if (known.has(`${plan.id}>${to.id}`) || known.has(`${to.id}>${plan.id}`)) continue;
+        if (restsOn(state, plan.id, to.id) || restsOn(state, to.id, plan.id)) continue;
+        known.add(`${plan.id}>${to.id}`);
+        out.push({ claim_id: plan.id, depends_on: to.id, why: l.why.trim() || "Suggested by the background check." });
+        added++;
+      }
+    }
+  }
+  return out;
+}

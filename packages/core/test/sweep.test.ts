@@ -5,6 +5,7 @@ import {
   hintOnlyClaims,
   materializeClaims,
   recheckClaims,
+  suggestLinks,
   type BrainState,
   type Event,
   type JsonModel,
@@ -139,5 +140,34 @@ describe("findDuplicates", () => {
     ]);
     s.transitions.push({ id: "t", claim_id: id("seen"), from_status: "IN", to_status: "REVIEW", depth: 0, explanation: `${DUPLICATE_PREFIX} "X is true"; confirm OUT to keep just one.`, at: "2026-10-24T00:00:00Z" });
     expect(await findDuplicates(dupModel([["c1", "c2", "c4"]]), s)).toEqual([]);
+  });
+});
+
+describe("suggestLinks", () => {
+  // Answers by the plan being asked about: "Claim to check: cN ...".
+  const linkModel = (byPlan: Record<string, string[]>): JsonModel => ({
+    async json(opts) {
+      const plan = /Claim to check: (c\d+)/.exec(opts.user)![1]!;
+      return opts.parse.parse({ depends_on: (byPlan[plan] ?? []).map((ref) => ({ ref, why: "rests on it" })) }) as never;
+    },
+  });
+
+  it("asks once per plan-like claim and drops unknown refs, self-links, known pairs, existing links and loops", async () => {
+    const { s, id } = state([
+      { ...c("tests", "All tests pass on main.", [until], "2026-10-20T00:00:00Z"), kind: "status" as const },
+      { ...c("deploy", "Deploy to production on Friday.", [until], "2026-10-21T00:00:00Z"), kind: "next_step" as const },
+      { ...c("blog", "Write the launch blog post.", [until], "2026-10-22T00:00:00Z"), kind: "next_step" as const },
+      { ...c("tweet", "Tweet the launch.", [{ type: "depends_on", claim: "blog" }], "2026-10-23T00:00:00Z"), kind: "next_step" as const },
+      { ...c("call", "Book the launch call.", [until], "2026-10-24T00:00:00Z"), kind: "next_step" as const },
+    ]);
+    // Refs by age: c1 tests, c2 deploy, c3 blog, c4 tweet, c5 call.
+    const known = new Set([`${id("tests")}>${id("call")}`]);
+    const asked: string[] = [];
+    const model = linkModel({ c2: ["c1", "c9", "c2"], c3: ["c4"], c4: ["c3"], c5: ["c1"] });
+    const spy: JsonModel = { json: (opts) => (asked.push(/Claim to check: (c\d+)/.exec(opts.user)![1]!), model.json(opts)) };
+    const out = await suggestLinks(spy, s, known);
+    expect(asked.sort()).toEqual(["c2", "c3", "c4", "c5"]); // the status claim isn't asked about
+    // c2>c1 kept; c9 unknown; c2 self; c3>c4 and c4>c3 already linked or a loop; c5>c1 known in the other direction.
+    expect(out).toEqual([{ claim_id: id("deploy"), depends_on: id("tests"), why: "rests on it" }]);
   });
 });
