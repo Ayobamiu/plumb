@@ -46,6 +46,7 @@ export async function ingest(
     .slice(0, MAX_IN_CLAIMS);
 
   const truncated = input.text.length > MAX_CHARS;
+  const started = Date.now();
   const result = await extractClaims(model, {
     text: truncated ? input.text.slice(-MAX_CHARS) : input.text,
     source: input.source,
@@ -86,6 +87,23 @@ export async function ingest(
   // Claims the text talked about, or added a reason to, are still in use.
   const sameAs = result.claims.flatMap((c) => (c.same_as ? [c.same_as] : []));
   await handlers.mention([...result.mentions, ...sameAs], input.at ?? now);
+
+  // One line per ingest in the server log, so a failed extraction is visible
+  // (it otherwise only shows as a raw-text summary and no title).
+  const failed = result.dropped.find((d) => d.text === "(whole text)");
+  console.log(
+    JSON.stringify({
+      ingest: source.kind,
+      external_id: source.external_id,
+      ok: !failed,
+      ...(failed && { error: failed.why.slice(0, 300) }),
+      chars: input.text.length,
+      ms: Date.now() - started,
+      claims: recorded.claims.length,
+      review: review.length,
+      title: source.title ?? null,
+    }),
+  );
 
   return {
     ...recorded,
