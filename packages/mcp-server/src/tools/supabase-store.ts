@@ -2,11 +2,12 @@
 // brain write goes through the plumb_apply function so it lands in one
 // transaction (supabase/migrations/20261026000002_vault_and_apply.sql).
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Claim, Event, EventKind, Project, Reason, Source, Transition } from "@plumb/core";
+import type { Claim, Event, Project, Reason, Source, Transition } from "@plumb/core";
 import {
   ConflictError,
   type BrainWrite,
   type ClaimFilter,
+  type EventFilter,
   type ProjectWithCounts,
   type ReasonFilter,
   type Store,
@@ -130,11 +131,24 @@ export class SupabaseStore implements Store {
     return rows.map(toReason);
   }
 
-  async loadEvents(filter: { kinds: EventKind[]; after: string }) {
-    const rows = await pages((a, b) =>
-      this.db.from("events").select("*").in("kind", filter.kinds).gt("occurred_at", filter.after).order("id").range(a, b),
-    );
+  async loadEvents(filter: EventFilter) {
+    const rows = await pages((a, b) => {
+      let q = this.db.from("events").select("*").in("kind", filter.kinds);
+      if (filter.after) q = q.gt("occurred_at", filter.after);
+      if (filter.observed_after) q = q.gt("observed_at", filter.observed_after);
+      return q.order("id").range(a, b);
+    });
     return rows.map(toEvent);
+  }
+
+  async getCursor(name: string) {
+    const [row] = check(await this.db.from("watcher_cursors").select("value").eq("name", name));
+    return row ? String(row.value) : undefined;
+  }
+
+  async setCursor(name: string, value: string) {
+    const { error } = await this.db.rpc("plumb_set_cursor", { p_name: name, p_value: value });
+    if (error) throw new Error(`supabase: ${error.message}`);
   }
 
   async loadTransitions(filter: TransitionFilter = {}) {

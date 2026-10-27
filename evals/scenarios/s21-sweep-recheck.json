@@ -1,0 +1,70 @@
+{
+  "id": "s21",
+  "title": "Sweep re-check: a teammate says the database is moving to Neon. It shares no words with 'We use Supabase for storage', so the quick check never sees it; the sweep sends the decision to REVIEW. The venue fact stays IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "storage",
+      "text": "We use Supabase for storage.",
+      "kind": "decision",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-25T12:00:00Z",
+          "pattern": {
+            "event_kind": "doc_edited",
+            "text_hint": "storage moved away from Supabase"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "venue",
+      "text": "Demo day is at the Hallway space.",
+      "kind": "fact",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-25T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "text_hint": "demo day venue changed"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "theo_db",
+      "kind": "email_received",
+      "occurred_at": "2026-10-27T10:00:00Z",
+      "from": "Theo Grant <theo@ourteam.io>",
+      "thread_id": "t-db-2",
+      "summary": "Heads up: we're moving the database to Neon next week; the migration starts Monday."
+    }
+  ],
+  "sweeps": [
+    {
+      "key": "sweep",
+      "at": "2026-10-27T15:00:00Z"
+    }
+  ],
+  "expected": [
+    {
+      "after": "theo_db",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "sweep",
+      "status": {
+        "storage": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

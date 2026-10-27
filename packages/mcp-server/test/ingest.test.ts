@@ -69,7 +69,7 @@ describe("ingest", () => {
 
     expect(model.user).toContain('thread_id t-loi: "LOI: sending it over" with avery@northfield.edu');
     expect(out.claims).toHaveLength(2);
-    expect(out.extracted_by).toBe("muse-spark-1.3/extract.v2");
+    expect(out.extracted_by).toBe("muse-spark-1.3/extract.v3");
     expect(out.dropped).toEqual([]);
 
     const reply: any = await callTool(store, "record_event", {

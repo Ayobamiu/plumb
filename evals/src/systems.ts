@@ -8,12 +8,14 @@ import {
   evaluateClaims,
   explainContradicted,
   extractClaims,
+  findDuplicates,
   knownThreads,
   loadPrompt,
   materializeClaims,
   modelCheck,
   MUSE_SPARK,
   onEvent,
+  recheckClaims,
   restore,
   selectCandidates,
   sendToReview,
@@ -76,6 +78,7 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
   const flagMs: number[] = [];
   const extractedIds: string[] = [];
   let eventIndex = 0;
+  let lastSweepAt = -Infinity;
 
   for (const step of timeline(s)) {
     const before = statusOf();
@@ -126,6 +129,20 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
           taken.add(hit.id);
         }
       }
+    } else if (step.type === "sweep") {
+      // The sleep-time sweep needs a model; without one it does nothing.
+      if (model) {
+        const at = Date.parse(step.at);
+        const news = state.events.filter((e) => Date.parse(e.occurred_at) > lastSweepAt && Date.parse(e.occurred_at) <= at);
+        const flags = [...(await recheckClaims(model, state, news)).flags, ...(await findDuplicates(model, state))];
+        const done = new Set<string>();
+        for (const f of flags) {
+          if (done.has(f.claim_id)) continue;
+          done.add(f.claim_id);
+          sendToReview(state, f.claim_id, ctx, { explanation: f.explanation, ...(f.event_id && { event_id: f.event_id }) });
+        }
+        lastSweepAt = at;
+      }
     } else {
       const id = keyToId.get(step.action.claim);
       if (id) {
@@ -135,7 +152,7 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
     }
 
     const after = statusOf();
-    if (step.type !== "action" && [...after].some(([k, v]) => before.get(k) === "IN" && v !== "IN" && v !== "MISSING")) {
+    if ((step.type === "event" || step.type === "text") && [...after].some(([k, v]) => before.get(k) === "IN" && v !== "IN" && v !== "MISSING")) {
       flagMs.push(Date.now() - started);
     }
     statusAfter.set(step.key, after);
@@ -158,7 +175,7 @@ async function runPlumb(s: Scenario, model?: JsonModel): Promise<SystemRun | nul
 
 // Baseline 2 (tab 5): give Muse Spark the claims and the events so far, and
 // ask which claims are now false. One call per event, so it sees what we see.
-// It needs claims written down, so it skips text scenarios and Usman's actions.
+// It needs claims written down, so it skips text scenarios, Usman's actions and sweeps.
 const BaselineOutput = z.object({ claims: z.array(z.object({ id: z.string(), status: z.enum(["IN", "OUT"]) })) });
 const BASELINE_SCHEMA = {
   type: "object",
@@ -178,7 +195,7 @@ const BASELINE_SCHEMA = {
 };
 
 async function runLlmOnly(s: Scenario, model: JsonModel): Promise<SystemRun | null> {
-  if (s.texts.length > 0 || s.actions.length > 0) return null;
+  if (s.texts.length > 0 || s.actions.length > 0 || s.sweeps.length > 0) return null;
   const developer = await loadPrompt("baseline.v1");
   // Neutral ids, so the model can't read hints from our keys.
   const ids = new Map(s.claims.map((c, i) => [`c${i + 1}`, c.temp_id]));

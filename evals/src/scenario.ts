@@ -3,7 +3,8 @@
 // - `texts` plus `find`: text goes through extraction (Brain Part A); `find`
 //   says which extracted claim each key means, by words it must contain.
 // - `actions`: Usman's decisions (confirm OUT, restore IN), replayed in order.
-// Texts, events and actions run as one timeline, ordered by time.
+// - `sweeps`: times the sleep-time sweep runs.
+// Texts, events, actions and sweeps run as one timeline, ordered by time.
 import { ClaimStatus, EventKind, NewClaim, SourceKind } from "@plumb/core";
 import { z } from "zod";
 
@@ -32,6 +33,8 @@ export const ScenarioAction = z.object({
   claim: z.string(), // claim key
 });
 
+export const ScenarioSweep = z.object({ key: z.string(), at: Timestamp });
+
 export const Checkpoint = z.object({
   after: z.string(), // event, text or action key
   // Only claims whose expected status changes need listing; others carry
@@ -52,11 +55,12 @@ export const Scenario = z
     find: z.record(z.string(), z.array(z.string().min(1)).min(1)).default({}),
     events: z.array(ScenarioEvent).default([]),
     actions: z.array(ScenarioAction).default([]),
+    sweeps: z.array(ScenarioSweep).default([]),
     expected: z.array(Checkpoint).min(1),
   })
   .superRefine((s, ctx) => {
     const claimKeys = new Set([...s.claims.map((c) => c.temp_id), ...Object.keys(s.find)]);
-    const stepKeys = new Set([...s.events, ...s.texts, ...s.actions].map((x) => x.key));
+    const stepKeys = new Set([...s.events, ...s.texts, ...s.actions, ...s.sweeps].map((x) => x.key));
     if (s.texts.length === 0 && Object.keys(s.find).length > 0) {
       ctx.addIssue({ code: "custom", message: "find needs texts" });
     }
@@ -78,14 +82,16 @@ export const claimKeys = (s: Scenario) => [...s.claims.map((c) => c.temp_id), ..
 export type Step =
   | { type: "event"; key: string; at: string; event: z.infer<typeof ScenarioEvent> }
   | { type: "text"; key: string; at: string; text: z.infer<typeof ScenarioText> }
-  | { type: "action"; key: string; at: string; action: z.infer<typeof ScenarioAction> };
+  | { type: "action"; key: string; at: string; action: z.infer<typeof ScenarioAction> }
+  | { type: "sweep"; key: string; at: string };
 
-/** One timeline in time order. Ties keep file order: texts, then events, then actions. */
+/** One timeline in time order. Ties keep file order: texts, events, actions, then sweeps. */
 export function timeline(s: Scenario): Step[] {
   const steps: Step[] = [
     ...s.texts.map((text) => ({ type: "text" as const, key: text.key, at: text.at, text })),
     ...s.events.map((event) => ({ type: "event" as const, key: event.key, at: event.occurred_at, event })),
     ...s.actions.map((action) => ({ type: "action" as const, key: action.key, at: action.at, action })),
+    ...s.sweeps.map((sw) => ({ type: "sweep" as const, key: sw.key, at: sw.at })),
   ];
   return steps.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)); // stable
 }

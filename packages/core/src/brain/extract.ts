@@ -11,7 +11,7 @@ import { MUSE_SPARK, type JsonCallOptions } from "../meta/client.js";
 import type { NewClaim, NewReason } from "../tools.js";
 import { normalizeAddress } from "./invalidate.js";
 
-export const EXTRACT_PROMPT = "extract.v2";
+export const EXTRACT_PROMPT = "extract.v3";
 const MAX_CLAIMS = 20;
 const QUOTE_MAX = 200;
 const MAX_THREADS = 50;

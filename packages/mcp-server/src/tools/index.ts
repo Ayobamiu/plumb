@@ -72,6 +72,7 @@ export async function callTool(
 export { createHandlers, ToolError, type HandlerOptions, type ReviewItem } from "./handlers.js";
 export { ingest } from "./ingest.js";
 export { knownThreads } from "@plumb/core"; // moved to core; kept here for existing imports
+export { sweep, type SweepResult } from "./sweep.js";
 export { ConflictError, type Store, type BrainWrite, type ProjectWithCounts } from "./store.js";
 export { SupabaseStore } from "./supabase-store.js";
 export { MemoryStore } from "./memory-store.js";

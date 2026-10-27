@@ -1,0 +1,71 @@
+{
+  "id": "s22",
+  "title": "Sweep duplicates: two claims say the demo is at Hallway; the newer one goes to REVIEW and the older is kept. The date and the contact are related but different, so they stay IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "old_venue",
+      "text": "Demo day is at the Hallway space.",
+      "kind": "fact",
+      "valid_from": "2026-10-23T12:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-05T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "date",
+      "text": "Demo day is on Nov 4.",
+      "kind": "fact",
+      "valid_from": "2026-10-24T12:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-05T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "contact",
+      "text": "Our contact at Hallway is Jordan Kim.",
+      "kind": "fact",
+      "valid_from": "2026-10-24T12:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-05T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "new_venue",
+      "text": "The demo day venue is Hallway.",
+      "kind": "fact",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-11-05T05:00:00Z"
+        }
+      ]
+    }
+  ],
+  "sweeps": [
+    {
+      "key": "sweep",
+      "at": "2026-10-26T03:00:00Z"
+    }
+  ],
+  "expected": [
+    {
+      "after": "sweep",
+      "status": {
+        "new_venue": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

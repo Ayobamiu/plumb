@@ -1,11 +1,12 @@
 // In-memory Store for tests. Returns copies, like a database would, so a
 // handler mutating what it loaded never changes stored rows by accident.
 import { randomUUID } from "node:crypto";
-import type { Claim, Event, EventKind, Project, Reason, Source, Transition } from "@plumb/core";
+import type { Claim, Event, Project, Reason, Source, Transition } from "@plumb/core";
 import {
   ConflictError,
   type BrainWrite,
   type ClaimFilter,
+  type EventFilter,
   type ProjectWithCounts,
   type ReasonFilter,
   type Store,
@@ -21,6 +22,7 @@ export class MemoryStore implements Store {
   reasons: Reason[] = [];
   events: Event[] = [];
   transitions: Transition[] = [];
+  cursors = new Map<string, string>();
 
   addProject(name: string): Project {
     const project = { id: randomUUID(), name, created_at: new Date().toISOString() };
@@ -69,10 +71,20 @@ export class MemoryStore implements Store {
       .map(copy);
   }
 
-  async loadEvents(filter: { kinds: EventKind[]; after: string }) {
+  async loadEvents(filter: EventFilter) {
     return this.events
-      .filter((e) => filter.kinds.includes(e.kind) && Date.parse(e.occurred_at) > Date.parse(filter.after))
+      .filter((e) => filter.kinds.includes(e.kind))
+      .filter((e) => !filter.after || Date.parse(e.occurred_at) > Date.parse(filter.after))
+      .filter((e) => !filter.observed_after || Date.parse(e.observed_at) > Date.parse(filter.observed_after))
       .map(copy);
+  }
+
+  async getCursor(name: string) {
+    return this.cursors.get(name);
+  }
+
+  async setCursor(name: string, value: string) {
+    this.cursors.set(name, value);
   }
 
   async loadTransitions(filter: TransitionFilter = {}) {

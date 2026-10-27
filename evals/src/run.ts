@@ -1,6 +1,8 @@
-// Eval runner. Usage: pnpm eval [--split dev|heldout|all] [--verbose] [--model]
+// Eval runner. Usage: pnpm eval [--split dev|heldout|all] [--verbose] [--model] [--runs N]
 // --model adds the systems that call Muse Spark (Plumb with extraction and the
 // Part C check, and the LLM-only baseline). pnpm eval:model sets that up.
+// --runs N repeats the model systems N times and pools their metrics: model
+// answers vary run to run, so one run can flip a borderline scenario.
 // Runs every scenario through each system and reports the tab 5 metrics.
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -15,6 +17,7 @@ const args = process.argv.slice(2);
 const split = args.includes("--split") ? args[args.indexOf("--split") + 1] : "dev";
 const verbose = args.includes("--verbose");
 const withModel = args.includes("--model");
+const runs = args.includes("--runs") ? Math.max(1, Number(args[args.indexOf("--runs") + 1]) || 1) : 1;
 
 interface Tally {
   detect: [number, number]; // [flagged, should flag], directly broken claims
@@ -27,6 +30,7 @@ interface Tally {
   flagMs: number[];
   scenariosPassed: number;
   scenarios: number;
+  exactPerRun: number[];
   skipped: string[];
   failures: string[];
 }
@@ -42,6 +46,7 @@ const empty = (): Tally => ({
   flagMs: [],
   scenariosPassed: 0,
   scenarios: 0,
+  exactPerRun: [],
   skipped: [],
   failures: [],
 });
@@ -121,19 +126,29 @@ const median = (xs: number[]) => {
 const scenarios = await loadScenarios();
 const report: Record<string, unknown> = { at: new Date().toISOString(), split, scenarios: scenarios.map((s) => s.id) };
 
-const all = { ...systems, ...(withModel ? modelSystems(new MetaClient()) : {}) };
+const models = withModel ? modelSystems(new MetaClient()) : {};
+const all = { ...systems, ...models };
 report.systems = Object.keys(all);
+report.runs = runs;
 
 for (const [name, system] of Object.entries(all)) {
   const t = empty();
-  for (const s of scenarios) {
-    const run = await system(s);
-    if (run) score(s, run, t);
-    else t.skipped.push(s.id);
+  // Plain-code systems give the same answer every time; only model systems repeat.
+  const times = name in models ? runs : 1;
+  for (let r = 0; r < times; r++) {
+    const before = t.scenariosPassed;
+    for (const s of scenarios) {
+      const run = await system(s);
+      if (run) score(s, run, t);
+      else if (r === 0) t.skipped.push(s.id);
+    }
+    t.exactPerRun.push(t.scenariosPassed - before);
   }
   report[name] = t;
   const skipped = t.skipped.length ? `, skipped ${t.skipped.length} (${t.skipped.join(", ")})` : "";
-  console.log(`\n${name}: ${t.scenariosPassed}/${t.scenarios} scenarios exact${skipped}`);
+  const perRun = t.scenarios / times;
+  const exact = times > 1 ? `exact per run ${t.exactPerRun.join(", ")} of ${perRun}` : `${t.scenariosPassed}/${t.scenarios} scenarios exact`;
+  console.log(`\n${name}: ${exact}${skipped}`);
   console.log(`  detection recall      ${pct(t.detect)}`);
   console.log(`  chain recall          ${pct(t.chain)}`);
   console.log(`  false retraction rate ${pct(t.falseOut)}`);

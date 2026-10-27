@@ -6,3 +6,4 @@ export * from "./brain/explain.js";
 export * from "./meta/client.js";
 export * from "./brain/extract.js";
 export * from "./brain/check.js";
+export * from "./brain/sweep.js";

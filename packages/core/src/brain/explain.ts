@@ -57,7 +57,7 @@ export function withNote(explanation: string, note: string): string {
 }
 
 /** Part C: the model thinks an event may break the claim. Usman decides. */
-export function explainModelCheck(event: Event, verdict: "yes" | "unsure", quote: string): string {
+function eventPhrase(event: Event): string {
   const what =
     event.kind === "email_received"
       ? `an email from ${event.from ?? "someone"}`
@@ -66,8 +66,28 @@ export function explainModelCheck(event: Event, verdict: "yes" | "unsure", quote
         : event.kind === "doc_edited"
           ? "a doc edit"
           : "a note";
-  const judged = verdict === "yes" ? "says this is no longer true" : "can't tell if this still holds";
-  return `Sent to REVIEW because a model check of ${what} at ${formatTime(event.occurred_at)} ${judged}: "${quote.replace(/[.!?]+$/, "")}".`;
+  return `${what} at ${formatTime(event.occurred_at)}`;
+}
+
+const judgedAs = (verdict: "yes" | "unsure") =>
+  verdict === "yes" ? "says this is no longer true" : "can't tell if this still holds";
+
+const unquote = (quote: string) => quote.replace(/[.!?]+$/, "");
+
+export function explainModelCheck(event: Event, verdict: "yes" | "unsure", quote: string): string {
+  return `Sent to REVIEW because a model check of ${eventPhrase(event)} ${judgedAs(verdict)}: "${unquote(quote)}".`;
+}
+
+/** Sleep-time sweep: a slower re-read of recent events caught what the quick check missed. */
+export function explainSweep(event: Event, verdict: "yes" | "unsure", quote: string): string {
+  return `Sent to REVIEW because the background check of ${eventPhrase(event)} ${judgedAs(verdict)}: "${unquote(quote)}".`;
+}
+
+export const DUPLICATE_PREFIX = "Sent to REVIEW because it looks like a repeat of";
+
+/** Sleep-time sweep: this claim says the same as an older one. Confirm OUT keeps just the older. */
+export function explainDuplicate(kept: Claim): string {
+  return `${DUPLICATE_PREFIX} "${unquote(kept.text)}"; confirm OUT to keep just one.`;
 }
 
 /** A model read new text and thinks it contradicts the claim. Usman decides. */

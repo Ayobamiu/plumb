@@ -29,6 +29,12 @@ export interface ReasonFilter {
   depends_on?: string[]; // depends_on reasons that point at these claims
 }
 
+export interface EventFilter {
+  kinds: EventKind[];
+  after?: string; // occurred_at after this time
+  observed_after?: string; // observed_at after this time
+}
+
 export interface TransitionFilter {
   claim_ids?: string[];
   since?: string; // at after this time
@@ -42,10 +48,13 @@ export interface Store {
   getSource(id: string): Promise<Source | undefined>;
   loadClaims(filter?: ClaimFilter): Promise<Claim[]>;
   loadReasons(filter?: ReasonFilter): Promise<Reason[]>;
-  /** Events of these kinds that happened after `after`. */
-  loadEvents(filter: { kinds: EventKind[]; after: string }): Promise<Event[]>;
+  /** Events of these kinds that happened after `after`, and/or that we saw after `observed_after`. */
+  loadEvents(filter: EventFilter): Promise<Event[]>;
   /** Oldest first. */
   loadTransitions(filter?: TransitionFilter): Promise<Transition[]>;
+  /** A named place marker in watcher_cursors (e.g. "sweep"), or undefined if never set. */
+  getCursor(name: string): Promise<string | undefined>;
+  setCursor(name: string, value: string): Promise<void>;
   /** Throws ConflictError if a claim's status is no longer expected_status. */
   apply(write: BrainWrite): Promise<void>;
 }

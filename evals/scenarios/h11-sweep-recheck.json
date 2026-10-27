@@ -1,0 +1,70 @@
+{
+  "id": "h11",
+  "title": "Sweep re-check (held-out): finance says freelancer invoices move to Remote.com. It barely shares words with 'We pay contractors through Deel', so only the sweep catches it. The Studio Kite fact stays IN.",
+  "split": "heldout",
+  "recorded_at": "2026-10-26T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "deel",
+      "text": "We pay contractors through Deel.",
+      "kind": "decision",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-26T12:00:00Z",
+          "pattern": {
+            "event_kind": "doc_edited",
+            "text_hint": "contractor payments moved off Deel"
+          }
+        }
+      ]
+    },
+    {
+      "temp_id": "kite",
+      "text": "The design contract with Studio Kite runs until March.",
+      "kind": "fact",
+      "valid_from": "2026-10-26T12:00:00Z",
+      "reasons": [
+        {
+          "type": "absence",
+          "since": "2026-10-26T12:00:00Z",
+          "pattern": {
+            "event_kind": "email_received",
+            "text_hint": "Studio Kite contract ended early"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "key": "finance",
+      "kind": "email_received",
+      "occurred_at": "2026-10-28T09:00:00Z",
+      "from": "Mira Shah <mira@ourteam.io>",
+      "thread_id": "t-fin-3",
+      "summary": "Starting December, all freelancer invoices go through Remote.com instead."
+    }
+  ],
+  "sweeps": [
+    {
+      "key": "sweep",
+      "at": "2026-10-28T12:00:00Z"
+    }
+  ],
+  "expected": [
+    {
+      "after": "finance",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "sweep",
+      "status": {
+        "deel": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}

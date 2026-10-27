@@ -1,0 +1,71 @@
+{
+  "id": "h12",
+  "title": "Sweep duplicates (held-out): two claims give the Kiln pilot start date; the newer goes to REVIEW. The budget and the contact stay IN.",
+  "split": "heldout",
+  "recorded_at": "2026-10-28T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "old_start",
+      "text": "The Kiln pilot starts on Nov 10.",
+      "kind": "fact",
+      "valid_from": "2026-10-27T12:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-12-31T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "budget",
+      "text": "The Kiln pilot budget is $12,000.",
+      "kind": "fact",
+      "valid_from": "2026-10-27T13:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-12-31T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "contact",
+      "text": "Rosa Lima is our contact at Kiln.",
+      "kind": "fact",
+      "valid_from": "2026-10-27T14:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-12-31T05:00:00Z"
+        }
+      ]
+    },
+    {
+      "temp_id": "new_start",
+      "text": "Our pilot with Kiln Studio begins November 10.",
+      "kind": "fact",
+      "valid_from": "2026-10-28T12:00:00Z",
+      "reasons": [
+        {
+          "type": "until",
+          "at": "2026-12-31T05:00:00Z"
+        }
+      ]
+    }
+  ],
+  "sweeps": [
+    {
+      "key": "sweep",
+      "at": "2026-10-29T03:00:00Z"
+    }
+  ],
+  "expected": [
+    {
+      "after": "sweep",
+      "status": {
+        "new_start": "REVIEW"
+      },
+      "chain": []
+    }
+  ]
+}
