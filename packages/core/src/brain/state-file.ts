@@ -66,5 +66,9 @@ export function renderProjectState(state: State, opts: { since: string; now: str
     lines.push("", `## ${heading}`, "", ...claims.map((c) => `- ${c.text}`));
   }
   if (!any) lines.push("", "## Current claims", "", "None yet.");
+  const quiet = state.quiet_claims?.length ?? 0;
+  if (quiet > 0) {
+    lines.push("", `${quiet} quiet ${quiet === 1 ? "claim is" : "claims are"} not shown: nobody has mentioned ${quiet === 1 ? "it" : "them"} lately. ${quiet === 1 ? "It is" : "They are"} still kept.`);
+  }
   return lines.join("\n") + "\n";
 }

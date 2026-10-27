@@ -28,6 +28,10 @@ export const ListProjectsOutput = z.object({ projects: z.array(ProjectWithCounts
 export const GetProjectStateInput = z.object({
   project_id: z.string(),
   since: Timestamp.optional(), // changes after this time; default is the last 24 hours
+  // Quiet rule (added Oct 27): IN claims with no activity (recorded, mentioned
+  // or status change) for this many days move to quiet_claims. Goals and
+  // decisions never go quiet. Default 7.
+  quiet_after_days: z.number().int().min(1).max(365).optional(),
 });
 export const ChangedClaim = z.object({ claim: Claim, transition: Transition });
 export const GetProjectStateOutput = z.object({
@@ -36,6 +40,7 @@ export const GetProjectStateOutput = z.object({
   changed_since: z.array(ChangedClaim), // went OUT or REVIEW after `since`
   summary: z.string().optional(), // optional Muse Spark handoff summary
   markdown: z.string().optional(), // the same state as PROJECT_STATE.md text (tab 1, generated state file)
+  quiet_claims: z.array(Claim).optional(), // still IN, just not shown by default (added Oct 27)
 });
 
 // record_claims

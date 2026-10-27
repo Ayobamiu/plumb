@@ -7,6 +7,7 @@ import {
   EventKind,
   findDuplicates,
   recheckClaims,
+  reviewSuggestions,
   suggestLinks,
   type BrainState,
   type JsonModel,
@@ -26,6 +27,7 @@ export interface SweepResult {
   events: number; // events new since the last sweep
   transitions: Transition[]; // claims sent to REVIEW
   links: number; // new link suggestions waiting for Usman
+  expired: number; // pending suggestions retired as no longer relevant
 }
 
 export async function sweep(store: Store, model: JsonModel): Promise<SweepResult> {
@@ -66,7 +68,22 @@ export async function sweep(store: Store, model: JsonModel): Promise<SweepResult
     links.map((l) => ({ ...l, project_id: state.claims.get(l.claim_id)!.project_id })),
   );
 
+  // Retire pending suggestions (from earlier sweeps) that no longer deserve attention.
+  // The relevance check sees every status change, so it needs all transitions here.
+  const pending = suggested.filter((l) => l.status === "pending");
+  let expired = 0;
+  if (pending.length) {
+    state.transitions = await store.loadTransitions({ claim_ids: [...new Set(pending.flatMap((p) => [p.claim_id, p.depends_on]))] });
+    const allEvents = await store.loadEvents({
+      kinds: EventKind.options.filter((k) => k !== "clock"),
+      after: pending.reduce((min, p) => (p.created_at < min ? p.created_at : min), until),
+    });
+    for (const e of await reviewSuggestions(model, { ...state, events: allEvents }, pending, until)) {
+      if (await store.expireLinkSuggestion(e.id, e.note, until)) expired++;
+    }
+  }
+
   // Move the cursor only after the writes, so a failed sweep is retried next time.
   await store.setCursor(CURSOR, until);
-  return { since, until, rechecked: recheck.checked, events: events.length, transitions, links: links.length };
+  return { since, until, rechecked: recheck.checked, events: events.length, transitions, links: links.length, expired };
 }

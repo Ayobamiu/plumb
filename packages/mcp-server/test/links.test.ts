@@ -92,4 +92,21 @@ describe("link suggestions", () => {
     expect(again.links).toBe(0);
     expect(store.links).toHaveLength(1);
   });
+
+  it("the sweep retires a pending suggestion that has become moot, without accepting it", async () => {
+    const { store, project } = await setup();
+    await sweep(store, model);
+    store.links[0]!.created_at = "2026-01-01T00:00:00Z"; // older than a day
+    const moot: JsonModel = {
+      async json(opts) {
+        if (opts.schemaName === "relevance") return opts.parse.parse({ live: false, why: "The Friday deploy is done." }) as never;
+        return model.json(opts);
+      },
+    };
+    const result = await sweep(store, moot);
+    expect(result.expired).toBe(1);
+    expect(store.links[0]).toMatchObject({ status: "expired", expired_because: "no_longer_relevant", expired_note: "The Friday deploy is done." });
+    expect(store.reasons.some((r) => r.type === "depends_on")).toBe(false);
+    expect((await listLinkSuggestions(store, { project_id: project.id })).suggestions).toEqual([]);
+  });
 });

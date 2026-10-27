@@ -5,6 +5,7 @@ import {
   hintOnlyClaims,
   materializeClaims,
   recheckClaims,
+  reviewSuggestions,
   suggestLinks,
   type BrainState,
   type Event,
@@ -169,5 +170,38 @@ describe("suggestLinks", () => {
     expect(asked.sort()).toEqual(["c2", "c3", "c4", "c5"]); // the status claim isn't asked about
     // c2>c1 kept; c9 unknown; c2 self; c3>c4 and c4>c3 already linked or a loop; c5>c1 known in the other direction.
     expect(out).toEqual([{ claim_id: id("deploy"), depends_on: id("tests"), why: "rests on it" }]);
+  });
+});
+
+describe("reviewSuggestions", () => {
+  const now = "2026-11-03T12:00:00Z";
+  const pending = (id: string, claim_id: string, depends_on: string, created_at: string) => ({ id, claim_id, depends_on, why: "rests on it", created_at });
+
+  it("expires by code when a claim went quiet, asks the model only about suggestions older than a day, and keeps them when it can't tell", async () => {
+    const { s, id } = state([
+      { ...c("deploy", "Deploy on Friday.", [until], "2026-11-01T00:00:00Z"), kind: "next_step" as const },
+      { ...c("tests", "Tests pass on main.", [until], "2026-11-01T00:00:00Z"), kind: "status" as const },
+      { ...c("old", "Pick the venue.", [until], "2026-10-01T00:00:00Z"), kind: "next_step" as const },
+    ]);
+    for (const cl of s.claims.values()) s.claims.set(cl.id, { ...cl, recorded_at: cl.valid_from });
+    const asked: string[] = [];
+    const model: JsonModel = {
+      async json(opts) {
+        asked.push(opts.user);
+        if (opts.user.includes("fail me")) throw new Error("timeout");
+        return opts.parse.parse({ live: false, why: "The deploy already happened." }) as never;
+      },
+    };
+    const out = await reviewSuggestions(model, s, [
+      pending("quiet", id("old"), id("tests"), "2026-11-01T00:00:00Z"), // "Pick the venue" is quiet
+      pending("fresh", id("deploy"), id("tests"), "2026-11-03T06:00:00Z"), // less than a day old
+      pending("moot", id("deploy"), id("tests"), "2026-11-01T06:00:00Z"),
+      { ...pending("broken", id("deploy"), id("tests"), "2026-11-01T06:00:00Z"), why: "fail me" },
+    ], now);
+    expect(out).toEqual([
+      { id: "quiet", note: 'Nobody has mentioned "Pick the venue" lately.' },
+      { id: "moot", note: "The deploy already happened." },
+    ]);
+    expect(asked).toHaveLength(2);
   });
 });

@@ -15,6 +15,7 @@ import { checkedQuote } from "./check.js";
 import { DUPLICATE_PREFIX, explainDuplicate, explainSweep } from "./explain.js";
 import { loadPrompt, type JsonModel } from "./extract.js";
 import { hasCodePattern, type BrainState } from "./invalidate.js";
+import { isQuiet } from "./quiet.js";
 
 export const RECHECK_PROMPT = "sweep-recheck.v2";
 export const DUPLICATES_PROMPT = "sweep-duplicates.v1";
@@ -313,4 +314,88 @@ export async function suggestLinks(
     }
   }
   return out;
+}
+
+// 4. Relevance of pending link suggestions: retire questions that no longer
+//    deserve Usman's attention (Oct 27). Never accepts anything. Cheapest first:
+//    a suggestion touching a quiet claim expires by code; others older than a
+//    day get one model question. Fresh ones are relevant by construction.
+
+export const RELEVANCE_PROMPT = "sweep-relevance.v1";
+const MAX_RELEVANCE = 20; // suggestions asked about per sweep
+const RELEVANCE_MIN_AGE_MS = 24 * 60 * 60 * 1000;
+
+export interface PendingSuggestion {
+  id: string;
+  claim_id: string;
+  depends_on: string;
+  why: string;
+  created_at: string;
+}
+
+export interface ExpiredSuggestion {
+  id: string;
+  note: string; // one line for Usman
+}
+
+const Relevance = z.object({ live: z.boolean(), why: z.string() });
+const RELEVANCE_SCHEMA = {
+  type: "object",
+  properties: { live: { type: "boolean" }, why: { type: "string" } },
+  required: ["live", "why"],
+  additionalProperties: false,
+};
+
+export async function reviewSuggestions(
+  model: JsonModel,
+  state: BrainState,
+  pending: PendingSuggestion[],
+  now: string,
+  modelId = MUSE_SPARK,
+): Promise<ExpiredSuggestion[]> {
+  const expired: ExpiredSuggestion[] = [];
+  const ask: PendingSuggestion[] = [];
+  for (const p of pending) {
+    const claim = state.claims.get(p.claim_id);
+    const base = state.claims.get(p.depends_on);
+    if (!claim || !base) continue;
+    const quiet = [claim, base].find((c) => isQuiet(c, state.transitions, now));
+    if (quiet) {
+      expired.push({ id: p.id, note: `Nobody has mentioned "${quiet.text.replace(/[.!?]+$/, "")}" lately.` });
+    } else if (Date.parse(now) - Date.parse(p.created_at) > RELEVANCE_MIN_AGE_MS) {
+      ask.push(p);
+    }
+  }
+  if (ask.length === 0) return expired;
+
+  const developer = await loadPrompt(RELEVANCE_PROMPT);
+  const answers = await inBatches(ask.slice(0, MAX_RELEVANCE), PARALLEL, async (p) => {
+    const since = state.events
+      .filter((e) => e.kind !== "clock" && Date.parse(e.occurred_at) > Date.parse(p.created_at))
+      .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))
+      .slice(-MAX_EVENTS);
+    try {
+      const v = await model.json({
+        job: "sweep_relevance",
+        developer,
+        user: [
+          `Claim: ${state.claims.get(p.claim_id)!.text}`,
+          `Rests on: ${state.claims.get(p.depends_on)!.text}`,
+          `Suggested ${p.created_at} because: ${p.why}`,
+          "",
+          "Events since, oldest first:",
+          ...(since.length ? since.map((e, i) => `${i + 1}. ${e.occurred_at} ${e.kind}${e.from ? ` from ${e.from}` : ""}:\n<<<\n${e.summary}\n>>>`) : ["(none)"]),
+        ].join("\n"),
+        schemaName: "relevance",
+        jsonSchema: RELEVANCE_SCHEMA,
+        parse: Relevance,
+        effort: "medium",
+        model: modelId,
+      });
+      return v.live ? undefined : { id: p.id, note: v.why.trim() || "No longer a live question." };
+    } catch {
+      return undefined; // keep it: a failed check never retires anything
+    }
+  });
+  return [...expired, ...answers.filter((a): a is ExpiredSuggestion => a !== undefined)];
 }

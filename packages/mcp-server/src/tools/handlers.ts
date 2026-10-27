@@ -8,6 +8,7 @@ import {
   confirmOut,
   evaluateClaims,
   explainEdited,
+  isQuiet,
   materializeClaims,
   modelCheck,
   onEvent,
@@ -159,8 +160,17 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
       const claims = await store.loadClaims({ project_id: project.id });
       const byId = new Map(claims.map((c) => [c.id, c]));
 
+      const now = new Date().toISOString();
+      const inIds = claims.filter((c) => c.status === "IN").map((c) => c.id);
+      // Status changes count as activity for the quiet rule (e.g. restored IN yesterday).
+      const history = inIds.length ? await store.loadTransitions({ claim_ids: inIds }) : [];
       const in_claims = Object.fromEntries(ClaimKind.options.map((k) => [k, [] as Claim[]])) as Record<ClaimKind, Claim[]>;
-      for (const c of claims) if (c.status === "IN") in_claims[c.kind].push(c);
+      const quiet_claims: Claim[] = [];
+      for (const c of claims) {
+        if (c.status !== "IN") continue;
+        if (isQuiet(c, history, now, input.quiet_after_days)) quiet_claims.push(c);
+        else in_claims[c.kind].push(c);
+      }
 
       const transitions = await store.loadTransitions({ since, to_statuses: ["OUT", "REVIEW"] });
       const changed_since = transitions
@@ -168,8 +178,8 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
         .reverse() // newest first
         .map((transition) => ({ claim: byId.get(transition.claim_id)!, transition }));
 
-      const markdown = renderProjectState({ project, in_claims, changed_since }, { since, now: new Date().toISOString() });
-      return { project, in_claims, changed_since, markdown };
+      const markdown = renderProjectState({ project, in_claims, changed_since, quiet_claims }, { since, now });
+      return { project, in_claims, changed_since, markdown, quiet_claims };
     },
 
     async record_claims(input: z.infer<typeof RecordClaimsInput>): Promise<z.infer<typeof RecordClaimsOutput>> {

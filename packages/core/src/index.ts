@@ -8,3 +8,4 @@ export * from "./brain/extract.js";
 export * from "./brain/check.js";
 export * from "./brain/sweep.js";
 export * from "./brain/state-file.js";
+export * from "./brain/quiet.js";

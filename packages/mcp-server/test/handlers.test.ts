@@ -260,3 +260,33 @@ describe("record_event with the Part C model check", () => {
     expect(calls).toBe(0);
   });
 });
+
+describe("get_project_state quiet rule", () => {
+  it("moves old, unmentioned claims to quiet_claims and says so in the markdown; goals stay", async () => {
+    const { store, project, call } = setup();
+    const out = await call("record_claims", {
+      project_id: project.id,
+      source: session,
+      extracted_by: "t",
+      claims: [
+        { temp_id: "old", text: "Pick the red or white shoes", kind: "open_question", valid_from: since, reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] },
+        { temp_id: "goal", text: "Ship Plumb", kind: "goal", valid_from: since, reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] },
+        { temp_id: "fresh", text: "Demo is Nov 4", kind: "fact", valid_from: since, reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] },
+      ],
+    });
+    const age = (key: string) => {
+      const c = store.claims.get(out.id_map[key])!;
+      store.claims.set(c.id, { ...c, recorded_at: "2026-01-01T00:00:00Z" });
+    };
+    age("old");
+    age("goal");
+    const state = await call("get_project_state", { project_id: project.id });
+    expect(state.quiet_claims.map((c: any) => c.text)).toEqual(["Pick the red or white shoes"]);
+    expect(state.in_claims.open_question).toEqual([]);
+    expect(state.in_claims.goal.map((c: any) => c.text)).toEqual(["Ship Plumb"]);
+    expect(state.markdown).toContain("1 quiet claim is not shown");
+    // Jan 1 is about 300 days ago: with a 365-day setting nothing is quiet.
+    const wider = await call("get_project_state", { project_id: project.id, quiet_after_days: 365 });
+    expect(wider.quiet_claims).toEqual([]);
+  });
+});
