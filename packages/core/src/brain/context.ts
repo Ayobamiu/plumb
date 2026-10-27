@@ -89,8 +89,10 @@ export function renderContext(input: ContextInput): string {
     `From Plumb: what this ${source.kind === "gmail_thread" ? "email thread" : source.kind === "doc" ? "doc" : "session"} said, and what of it is still true now. Last active ${formatTime(lastAt)}.`,
   ];
 
+  // Summaries starting "..." are raw-text fallbacks from before Oct 27 (a failed
+  // extraction); they read as noise, so the view leaves them out.
   const summaries = [...input.events]
-    .filter((e) => e.kind !== "clock")
+    .filter((e) => e.kind !== "clock" && !e.summary.startsWith("..."))
     .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))
     .slice(-MAX_SUMMARIES);
   // Summaries are one line each; a raw fallback summary can hold newlines and headings.

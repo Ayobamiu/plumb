@@ -177,19 +177,21 @@ describe("ingest records the text as an event", () => {
     expect(store.claims.get(out.claims[0]!.id)!.status).toBe("IN");
   });
 
-  it("uses doc_edited for a doc, and the end of the text when extraction fails", async () => {
+  it("uses doc_edited for a doc; if extraction fails, saves nothing and asks the caller to retry", async () => {
     const store = new MemoryStore();
     const project = store.addProject("p");
-    const failing: JsonModel = { async json() { throw new Error("down"); } };
-    const out = await ingest(store, failing, {
+    const ok = await ingest(store, fakeModel({ claims: [], contradicts: [], summary: "Hosting moved to Fly.io." }), {
       project_id: project.id,
       source: { kind: "doc", external_id: "doc-1#tab-2", title: "Launch plan: Decisions" },
-      text: "x".repeat(700) + " We moved hosting to Fly.io.",
+      text: "We moved hosting to Fly.io.",
     });
-    expect(out.event.kind).toBe("doc_edited");
-    expect(out.event.summary.startsWith("...")).toBe(true);
-    expect(out.event.summary.endsWith("We moved hosting to Fly.io.")).toBe(true);
-    expect(out.event.summary.length).toBeLessThanOrEqual(1000);
+    expect(ok.event.kind).toBe("doc_edited");
+
+    const failing: JsonModel = { async json() { throw new Error("down"); } };
+    await expect(
+      ingest(store, failing, { project_id: project.id, source: { kind: "doc", external_id: "doc-1#tab-2" }, text: "x".repeat(700) }),
+    ).rejects.toMatchObject({ code: "unavailable" });
+    expect(store.events).toHaveLength(1); // only the first, good save
   });
 });
 

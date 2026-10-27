@@ -56,6 +56,16 @@ export async function ingest(
     threads: knownThreads(emails),
   });
 
+  // If extraction failed outright, write nothing and say so: the caller keeps its
+  // place (doc watcher cursor, hook save state) and sends the text again later.
+  // Saving the raw text as the summary would hide the failure and show raw text
+  // wherever the session is @'d.
+  const failed = result.dropped.find((d) => d.text === "(whole text)");
+  if (failed) {
+    console.log(JSON.stringify({ ingest: input.source.kind, external_id: input.source.external_id, ok: false, error: failed.why.slice(0, 300), chars: input.text.length, ms: Date.now() - started }));
+    throw new ToolError("unavailable", `extraction failed, nothing was saved; send the text again later (${failed.why})`);
+  }
+
   // The tool's own title wins (e.g. a Cursor conversation title); otherwise the one extraction wrote.
   const nativeTitle = input.source.title?.trim();
   const title = nativeTitle && !isGenericTitle(nativeTitle) ? nativeTitle : result.title || nativeTitle;
@@ -63,6 +73,7 @@ export async function ingest(
 
   const handlers = createHandlers(store, { model });
   const text = input.text.trim();
+  // Extraction worked but wrote no summary: fall back to the end of the text.
   const summary = result.summary || (text.length > FALLBACK_SUMMARY ? `...${text.slice(-FALLBACK_SUMMARY)}` : text);
   const recordedEvent = await handlers.record_event({
     kind: source.kind === "doc" ? "doc_edited" : "session_note",
@@ -88,15 +99,12 @@ export async function ingest(
   const sameAs = result.claims.flatMap((c) => (c.same_as ? [c.same_as] : []));
   await handlers.mention([...result.mentions, ...sameAs], input.at ?? now);
 
-  // One line per ingest in the server log, so a failed extraction is visible
-  // (it otherwise only shows as a raw-text summary and no title).
-  const failed = result.dropped.find((d) => d.text === "(whole text)");
+  // One line per ingest in the server log.
   console.log(
     JSON.stringify({
       ingest: source.kind,
       external_id: source.external_id,
-      ok: !failed,
-      ...(failed && { error: failed.why.slice(0, 300) }),
+      ok: true,
       chars: input.text.length,
       ms: Date.now() - started,
       claims: recorded.claims.length,

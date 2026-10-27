@@ -45,7 +45,8 @@ import { ConflictError, type ClaimUpdate, type Store } from "./store.js";
 
 export class ToolError extends Error {
   constructor(
-    readonly code: "bad_input" | "not_found",
+    // unavailable: a model call failed for now; the caller should keep its place and retry.
+    readonly code: "bad_input" | "not_found" | "unavailable",
     message: string,
   ) {
     super(message);

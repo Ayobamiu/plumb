@@ -62,3 +62,22 @@ describe("displayTitle", () => {
     expect(displayTitle("Cursor agent response", "")).toBeUndefined();
   });
 });
+
+describe("renderContext leaves out raw-text fallback summaries", () => {
+  it("skips summaries starting with ...", () => {
+    const at = "2026-10-27T18:00:00Z";
+    const md = renderContext({
+      source,
+      lastAt: at,
+      events: [
+        { id: "a", kind: "doc_edited", source_id: source.id, occurred_at: at, observed_at: at, summary: "...raw tail of a tab ## Rules" },
+        { id: "b", kind: "doc_edited", source_id: source.id, occurred_at: at, observed_at: at, summary: "The rules section was tightened." },
+      ],
+      claims: [],
+      latestTransition: new Map(),
+      changedSince: [],
+    });
+    expect(md).toContain("The rules section was tightened.");
+    expect(md).not.toContain("raw tail");
+  });
+});
