@@ -11,6 +11,7 @@ import {
   materializeClaims,
   modelCheck,
   onEvent,
+  renderProjectState,
   restore,
   selectCandidates,
   sendToReview,
@@ -153,7 +154,8 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
         .reverse() // newest first
         .map((transition) => ({ claim: byId.get(transition.claim_id)!, transition }));
 
-      return { project, in_claims, changed_since };
+      const markdown = renderProjectState({ project, in_claims, changed_since }, { since, now: new Date().toISOString() });
+      return { project, in_claims, changed_since, markdown };
     },
 
     async record_claims(input: z.infer<typeof RecordClaimsInput>): Promise<z.infer<typeof RecordClaimsOutput>> {

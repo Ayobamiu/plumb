@@ -133,6 +133,9 @@ describe("get_project_state and explain_claim", () => {
     expect(state.in_claims.next_step).toEqual([]);
     expect(state.changed_since).toHaveLength(3);
     expect(state.changed_since.at(-1).claim.id).toBe(ids.noreply);
+    expect(state.markdown).toMatch(/^# Project state: Meta hackathon\n/);
+    expect(state.markdown).toContain("  - OUT: Follow up with Avery Friday. Went OUT because");
+    expect(state.markdown).toContain("## Facts\n\n- Demo is Nov 4");
   });
 
   it("explains a claim: reasons, both directions of the chain, history", async () => {

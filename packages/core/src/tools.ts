@@ -35,6 +35,7 @@ export const GetProjectStateOutput = z.object({
   in_claims: z.record(ClaimKind, z.array(Claim)),
   changed_since: z.array(ChangedClaim), // went OUT or REVIEW after `since`
   summary: z.string().optional(), // optional Muse Spark handoff summary
+  markdown: z.string().optional(), // the same state as PROJECT_STATE.md text (tab 1, generated state file)
 });
 
 // record_claims
