@@ -1,0 +1,11 @@
+# Point Railway's config file at this path, or copy these settings in the UI.
+# Root Directory for the service can stay the repo root (Dockerfile context).
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "packages/mcp-server/deploy/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

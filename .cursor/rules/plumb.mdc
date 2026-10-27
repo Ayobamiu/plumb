@@ -15,6 +15,7 @@ The spec lives in Usman's Docs app, read through the docs MCP:
 
 - Document: "Context Tool, Meta Hack" (id ede34f81-56d6-46e1-8189-691d8803f9eb)
 - At the start of every task, read Overview, 1. Contract, the tabs you own (4 and 6), and 7. Progress log.
+- Prefer Plumb MCP `get_project_state` (or the SessionStart hook context) for the live claim set. The Progress log is the bootstrap until write-back is trusted.
 - The Contract is final. Never redefine its types. Import them from packages/core.
 
 If the doc and this file disagree, the doc wins.

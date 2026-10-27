@@ -9,6 +9,9 @@
     "eval": "pnpm --filter @plumb/evals run eval",
     "eval:model": "pnpm --filter @plumb/evals run eval:model",
     "dev:web": "pnpm --filter @plumb/web dev",
+    "dev:mcp": "pnpm --filter @plumb/mcp-server dev",
+    "watch:gmail": "pnpm --filter @plumb/watchers gmail",
+    "watch:clock": "pnpm --filter @plumb/watchers clock",
     "smoke:db": "cd packages/mcp-server && tsx --env-file=../../.env src/tools/smoke.ts",
     "smoke:extract": "cd packages/core && META_COST_LOG=../../logs/meta-calls.jsonl tsx --env-file=../../.env src/meta/smoke-extract.ts",
     "smoke:meta": "cd packages/core && META_COST_LOG=../../logs/meta-calls.jsonl tsx --env-file=../../.env src/meta/smoke.ts"

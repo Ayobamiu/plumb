@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "plumb": {
+      "url": "https://mcp-production-a566.up.railway.app/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_PLUMB_TOKEN_CURSOR_OR_CLAUDE_CODE"
+      }
+    }
+  }
+}

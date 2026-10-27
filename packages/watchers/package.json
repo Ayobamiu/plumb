@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gmail": "tsx --env-file=../../.env src/gmail.ts",
-    "clock": "tsx --env-file=../../.env src/clock.ts"
+    "clock": "tsx --env-file=../../.env src/clock.ts",
+    "check:gmail": "tsx --env-file=../../.env src/check-gmail-ready.ts"
   },
   "dependencies": {
     "@plumb/core": "workspace:*",
