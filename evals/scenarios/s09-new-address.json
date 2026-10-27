@@ -1,0 +1,36 @@
+{
+  "id": "s09",
+  "title": "Implicit conflict: 'Matt is unresponsive', then Matt writes from a new address in a new thread. Expect REVIEW.",
+  "split": "dev",
+  "recorded_at": "2026-10-24T18:00:00Z",
+  "claims": [
+    {
+      "temp_id": "matt_silent",
+      "text": "Matt Okafor is unresponsive about the design review.",
+      "kind": "status",
+      "valid_from": "2026-10-22T09:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-22T09:00:00Z",
+          "pattern": { "event_kind": "email_received", "from": "matt.okafor@oldco.com", "thread_id": "t-design-12" } }
+      ]
+    },
+    {
+      "temp_id": "storage",
+      "text": "We use Supabase for storage.",
+      "kind": "decision",
+      "valid_from": "2026-10-24T18:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-24T18:00:00Z",
+          "pattern": { "event_kind": "doc_edited", "text_hint": "storage switched away from Supabase" } }
+      ]
+    }
+  ],
+  "events": [
+    { "key": "matt_new_address", "kind": "email_received", "occurred_at": "2026-10-26T16:10:00Z",
+      "from": "Matt Okafor <matt@newco.io>", "thread_id": "t-mo-1",
+      "summary": "Design review: my comments are in the doc. New job, so use this address from now on." }
+  ],
+  "expected": [
+    { "after": "matt_new_address", "status": { "matt_silent": "REVIEW" } }
+  ]
+}

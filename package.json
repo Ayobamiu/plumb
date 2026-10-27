@@ -7,6 +7,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "eval": "pnpm --filter @plumb/evals run eval",
+    "eval:model": "pnpm --filter @plumb/evals run eval:model",
     "dev:web": "pnpm --filter @plumb/web dev",
     "smoke:db": "cd packages/mcp-server && tsx --env-file=../../.env src/tools/smoke.ts",
     "smoke:extract": "cd packages/core && META_COST_LOG=../../logs/meta-calls.jsonl tsx --env-file=../../.env src/meta/smoke-extract.ts",

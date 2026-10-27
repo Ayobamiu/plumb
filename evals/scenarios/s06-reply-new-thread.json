@@ -1,0 +1,33 @@
+{
+  "id": "s06",
+  "title": "Avery replies in a new thread: the thread-scoped pattern misses, the model check sends the claim to REVIEW. An unrelated goal stays IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T15:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Avery about the LOI yet.",
+      "kind": "status",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-25T12:00:00Z",
+          "pattern": { "event_kind": "email_received", "from": "avery.hart@northfield.edu", "thread_id": "t-loi-101" } }
+      ]
+    },
+    {
+      "temp_id": "ship_goal",
+      "text": "Ship Plumb for the Meta hackathon.",
+      "kind": "goal",
+      "valid_from": "2026-10-25T12:00:00Z",
+      "reasons": [{ "type": "until", "at": "2026-11-05T02:00:00Z" }]
+    }
+  ],
+  "events": [
+    { "key": "avery_new_thread", "kind": "email_received", "occurred_at": "2026-10-27T09:30:00Z",
+      "from": "Avery Hart <avery.hart@northfield.edu>", "thread_id": "t-loi-202",
+      "summary": "LOI signed: sorry for the new thread, the signed letter of intent is attached." }
+  ],
+  "expected": [
+    { "after": "avery_new_thread", "status": { "no_reply": "REVIEW" } }
+  ]
+}

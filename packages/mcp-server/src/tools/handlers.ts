@@ -7,11 +7,12 @@ import {
   ClaimKind,
   confirmOut,
   evaluateClaims,
-  explainContradicted,
   explainEdited,
   materializeClaims,
+  modelCheck,
   onEvent,
   restore,
+  selectCandidates,
   sendToReview,
   withNote,
   type BrainContext,
@@ -19,8 +20,8 @@ import {
   type Change,
   type Claim,
   type ClaimStatus,
-  type Contradiction,
   type Event,
+  type JsonModel,
   type ExplainClaimInput,
   type ExplainClaimOutput,
   type GetProjectStateInput,
@@ -98,8 +99,41 @@ async function mustProject(store: Store, id: string) {
   return project;
 }
 
-export function createHandlers(store: Store) {
+/** A claim to send to REVIEW, with its one-sentence explanation. */
+export interface ReviewItem {
+  claim_id: string;
+  explanation: string;
+  event_id?: string;
+}
+
+export interface HandlerOptions {
+  model?: JsonModel; // runs Part C on record_event; without it only Part B runs
+}
+
+export function createHandlers(store: Store, opts: HandlerOptions = {}) {
+  /** Not an MCP tool: send claims to REVIEW (Part C and /ingest). Never OUT. */
+  async function review(items: ReviewItem[]): Promise<Transition[]> {
+    if (items.length === 0) return [];
+    return withRetry(async () => {
+      const ctx = context();
+      const state = await loadBrain(store);
+      const before = statuses(state);
+      const changes = items.flatMap((item) =>
+        state.claims.has(item.claim_id)
+          ? sendToReview(state, item.claim_id, ctx, {
+              explanation: item.explanation,
+              ...(item.event_id && { event_id: item.event_id }),
+            })
+          : [],
+      );
+      await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
+      return changes.map((c) => c.transition);
+    });
+  }
+
   return {
+    review,
+
     async list_projects(): Promise<z.infer<typeof ListProjectsOutput>> {
       return { projects: await store.listProjects() };
     },
@@ -170,7 +204,7 @@ export function createHandlers(store: Store) {
     },
 
     async record_event(input: z.infer<typeof RecordEventInput>): Promise<z.infer<typeof RecordEventOutput>> {
-      return withRetry(async () => {
+      const partB = await withRetry(async () => {
         const ctx = context();
         const source = await store.upsertSource(input.source);
         const event: Event = {
@@ -189,11 +223,21 @@ export function createHandlers(store: Store) {
         const transitions = changes.map((c) => c.transition);
 
         // The clock ticks every minute. Keep only the ticks that changed something.
-        if (event.kind === "clock" && changes.length === 0) return { event, transitions };
+        if (event.kind === "clock" && changes.length === 0) return { event, transitions, state };
 
         await store.apply({ event, updates: updatesFor(state, before, changes), transitions });
-        return { event, transitions };
+        return { event, transitions, state };
       });
+
+      // Part C, after Part B is written: ask the model about IN claims the
+      // patterns didn't catch. Model calls stay outside the retry loop, so a
+      // write conflict never pays for them twice.
+      const { event, transitions, state } = partB;
+      const candidates = opts.model ? selectCandidates(state, event) : [];
+      if (candidates.length === 0) return { event, transitions };
+      const checked = await modelCheck(opts.model!, event, candidates);
+      const reviewed = await review(checked.flags);
+      return { event, transitions: [...transitions, ...reviewed] };
     },
 
     async explain_claim(input: z.infer<typeof ExplainClaimInput>): Promise<z.infer<typeof ExplainClaimOutput>> {
@@ -239,23 +283,6 @@ export function createHandlers(store: Store) {
 
         await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
         return { transitions: changes.map((c) => c.transition) };
-      });
-    },
-
-    /** Not an MCP tool: /ingest calls this when new text contradicts current claims. REVIEW only, never OUT. */
-    async review_contradictions(contradictions: Contradiction[], sourceTitle: string): Promise<Transition[]> {
-      if (contradictions.length === 0) return [];
-      return withRetry(async () => {
-        const ctx = context();
-        const state = await loadBrain(store);
-        const before = statuses(state);
-        const changes = contradictions.flatMap((c) =>
-          state.claims.has(c.claim_id)
-            ? sendToReview(state, c.claim_id, ctx, { explanation: explainContradicted(sourceTitle, c.quote) })
-            : [],
-        );
-        await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
-        return changes.map((c) => c.transition);
       });
     },
   };

@@ -1,0 +1,36 @@
+{
+  "id": "s12",
+  "title": "A colleague forwards the board's answer: different sender, different thread. The model check sends the claim to REVIEW.",
+  "split": "dev",
+  "recorded_at": "2026-10-23T12:00:00Z",
+  "claims": [
+    {
+      "temp_id": "budget_pending",
+      "text": "No answer yet from the Northfield board on the pilot budget.",
+      "kind": "status",
+      "valid_from": "2026-10-20T12:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-20T12:00:00Z",
+          "pattern": { "event_kind": "email_received", "from": "board@northfield.edu", "thread_id": "t-budget-4" } }
+      ]
+    },
+    {
+      "temp_id": "venue",
+      "text": "Demo day is at the Hallway space.",
+      "kind": "fact",
+      "valid_from": "2026-10-23T12:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-23T12:00:00Z",
+          "pattern": { "event_kind": "email_received", "text_hint": "demo day venue changed" } }
+      ]
+    }
+  ],
+  "events": [
+    { "key": "forwarded", "kind": "email_received", "occurred_at": "2026-10-26T11:00:00Z",
+      "from": "Avery Hart <avery.hart@northfield.edu>", "thread_id": "t-fwd-8",
+      "summary": "Fwd: Pilot budget: good news, the board approved the full pilot budget yesterday." }
+  ],
+  "expected": [
+    { "after": "forwarded", "status": { "budget_pending": "REVIEW" } }
+  ]
+}

@@ -4,6 +4,7 @@
 // writes what passed the checks, and contradicted claims go to REVIEW.
 import type { z } from "zod";
 import {
+  explainContradicted,
   extractClaims,
   normalizeAddress,
   type Event,
@@ -84,7 +85,9 @@ export async function ingest(
       })
     : { claims: [], reasons: [], id_map: {} };
   const sourceTitle = input.source.title ? `"${input.source.title}"` : `a ${input.source.kind.replace("_", " ")} note`;
-  const review = await handlers.review_contradictions(result.contradicts, sourceTitle);
+  const review = await handlers.review(
+    result.contradicts.map((c) => ({ claim_id: c.claim_id, explanation: explainContradicted(sourceTitle, c.quote) })),
+  );
 
   return { ...recorded, extracted_by: result.extracted_by, review, dropped: result.dropped, truncated };
 }

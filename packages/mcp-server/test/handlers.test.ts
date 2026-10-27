@@ -8,7 +8,7 @@ const since = "2026-10-25T00:00:00Z";
 function setup() {
   const store = new MemoryStore();
   const project = store.addProject("Meta hackathon");
-  const call = (name: string, input: unknown) => callTool(store, name, input) as Promise<any>;
+  const call = (name: string, input: unknown) => callTool(store, name, input, { model: null }) as Promise<any>;
   const status = (id: string) => store.claims.get(id)!.status;
   return { store, project, call, status };
 }
@@ -200,3 +200,60 @@ describe("list_projects", () => {
 // Keep the Store interface honest: MemoryStore must satisfy it.
 const _check: Store = new MemoryStore();
 void _check;
+
+describe("record_event with the Part C model check", () => {
+  it("sends a claim the patterns missed to REVIEW, never OUT, and leaves its dependents IN", async () => {
+    const store = new MemoryStore();
+    const project = store.addProject("p");
+    const seeded: any = await callTool(
+      store,
+      "record_claims",
+      {
+        project_id: project.id,
+        source: { kind: "claude_code", external_id: "s1" },
+        extracted_by: "t",
+        claims: [
+          {
+            temp_id: "matt",
+            text: "Matt is unresponsive about the contract.",
+            kind: "status",
+            valid_from: since,
+            reasons: [{ type: "absence", since, pattern: { event_kind: "email_received", from: "matt@old.com", thread_id: "t-contract" } }],
+          },
+          { temp_id: "chase", text: "Chase Matt's boss on Monday.", kind: "next_step", valid_from: since, reasons: [{ type: "depends_on", claim: "matt" }] },
+        ],
+      },
+      { model: null },
+    );
+    let calls = 0;
+    const model = {
+      async json(opts: any) {
+        calls++;
+        return opts.user.includes("unresponsive")
+          ? opts.parse.parse({ verdict: "yes", quote: "signed copy attached", why: "He replied." })
+          : opts.parse.parse({ verdict: "no", quote: null, why: "Still worth chasing? Not shown." });
+      },
+    };
+    const out: any = await callTool(
+      store,
+      "record_event",
+      { ...reply(), from: "Matt Jones <matt@new.com>", thread_id: "t-other", summary: "Contract: signed copy attached" },
+      { model },
+    );
+    expect(calls).toBe(2); // both claims name Matt
+    expect(out.transitions).toHaveLength(1);
+    expect(out.transitions[0]).toMatchObject({ to_status: "REVIEW", event_id: out.event.id });
+    expect(store.claims.get(seeded.id_map.matt)!.status).toBe("REVIEW");
+    expect(store.claims.get(seeded.id_map.chase)!.status).toBe("IN");
+  });
+
+  it("does not call the model when Part B already handled it or nothing is related", async () => {
+    const { store, project, call } = setup();
+    await seed(call, project.id);
+    let calls = 0;
+    const model = { async json(): Promise<never> { calls++; throw new Error("should not run"); } };
+    await callTool(store, "record_event", reply(), { model }); // Part B takes all three claims OUT
+    await callTool(store, "record_event", { ...reply(), from: "news@example.com", thread_id: "t9", summary: "Weekly newsletter" }, { model });
+    expect(calls).toBe(0);
+  });
+});

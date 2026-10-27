@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "eval": "tsx src/run.ts",
+    "eval:model": "META_COST_LOG=../logs/meta-calls.jsonl tsx --env-file=../.env src/run.ts --model",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

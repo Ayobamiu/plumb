@@ -1,16 +1,20 @@
-// Eval runner. Usage: pnpm eval [--split dev|heldout|all] [--verbose]
+// Eval runner. Usage: pnpm eval [--split dev|heldout|all] [--verbose] [--model]
+// --model adds the systems that call Muse Spark (Plumb with the Part C check,
+// and the LLM-only baseline). pnpm eval:model sets that up.
 // Runs every scenario through each system and reports the tab 5 metrics.
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Scenario } from "./scenario.js";
-import { systems, type SystemRun } from "./systems.js";
+import { MetaClient } from "@plumb/core";
+import { modelSystems, systems, type SystemRun } from "./systems.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const args = process.argv.slice(2);
 const split = args.includes("--split") ? args[args.indexOf("--split") + 1] : "dev";
 const verbose = args.includes("--verbose");
+const withModel = args.includes("--model");
 
 interface Tally {
   detect: [number, number]; // [flagged, should flag], directly broken claims
@@ -86,7 +90,10 @@ const pct = ([n, d]: [number, number]) => (d === 0 ? "n/a" : `${((100 * n) / d).
 const scenarios = await loadScenarios();
 const report: Record<string, unknown> = { at: new Date().toISOString(), split, scenarios: scenarios.map((s) => s.id) };
 
-for (const [name, system] of Object.entries(systems)) {
+const all = { ...systems, ...(withModel ? modelSystems(new MetaClient()) : {}) };
+report.systems = Object.keys(all);
+
+for (const [name, system] of Object.entries(all)) {
   const t = empty();
   for (const s of scenarios) score(s, await system(s), t);
   report[name] = t;
@@ -95,7 +102,7 @@ for (const [name, system] of Object.entries(systems)) {
   console.log(`  chain recall          ${pct(t.chain)}`);
   console.log(`  false retraction rate ${pct(t.falseOut)}`);
   console.log(`  REVIEW precision      ${pct(t.review)}`);
-  if (verbose || name === "plumb") t.failures.forEach((f) => console.log(`  FAIL ${f}`));
+  if (verbose || name.startsWith("plumb")) t.failures.forEach((f) => console.log(`  FAIL ${f}`));
 }
 
 const outDir = join(root, "results");

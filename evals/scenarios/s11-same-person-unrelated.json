@@ -1,0 +1,30 @@
+{
+  "id": "s11",
+  "title": "Priya writes about something unrelated in a new thread: the contract claim must stay IN, with no REVIEW. Tests REVIEW precision.",
+  "split": "dev",
+  "recorded_at": "2026-10-25T10:00:00Z",
+  "claims": [
+    {
+      "temp_id": "no_reply",
+      "text": "No reply from Priya on the contract.",
+      "kind": "status",
+      "valid_from": "2026-10-25T09:00:00Z",
+      "reasons": [
+        { "type": "absence", "since": "2026-10-25T09:00:00Z",
+          "pattern": { "event_kind": "email_received", "from": "priya.nair@example.org", "thread_id": "t-contract-3" } }
+      ]
+    }
+  ],
+  "events": [
+    { "key": "priya_photos", "kind": "email_received", "occurred_at": "2026-10-26T15:00:00Z",
+      "from": "Priya Nair <priya.nair@example.org>", "thread_id": "t-offsite-4",
+      "summary": "Offsite photos: the team photos from Saturday are up on the shared drive." },
+    { "key": "priya_lunch", "kind": "email_received", "occurred_at": "2026-10-26T17:00:00Z",
+      "from": "priya.nair@example.org", "thread_id": "t-lunch-9",
+      "summary": "Lunch Friday? Thinking the Thai place." }
+  ],
+  "expected": [
+    { "after": "priya_photos", "status": {} },
+    { "after": "priya_lunch", "status": {} }
+  ]
+}

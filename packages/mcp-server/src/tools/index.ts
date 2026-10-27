@@ -10,6 +10,7 @@
 //   const body = IngestInput.parse(json); // from @plumb/core, 400 on failure
 //   const result = await ingest(store, new MetaClient(), body);
 import {
+  MetaClient,
   ExplainClaimInput,
   GetProjectStateInput,
   ListProjectsInput,
@@ -17,6 +18,7 @@ import {
   RecordEventInput,
   ResolveReviewInput,
 } from "@plumb/core";
+import type { JsonModel } from "@plumb/core";
 import { createHandlers, ToolError } from "./handlers.js";
 import type { Store } from "./store.js";
 
@@ -47,15 +49,27 @@ export function isToolName(name: string): name is ToolName {
   return Object.hasOwn(toolInputs, name);
 }
 
-export async function callTool(store: Store, name: string, input: unknown): Promise<unknown> {
+// record_event runs the Part C model check when a model is available. Left
+// out, the model comes from META_MODEL_API_KEY if set; pass null to turn it off.
+function defaultModel(): JsonModel | undefined {
+  return process.env.META_MODEL_API_KEY ? new MetaClient() : undefined;
+}
+
+export async function callTool(
+  store: Store,
+  name: string,
+  input: unknown,
+  opts: { model?: JsonModel | null } = {},
+): Promise<unknown> {
   if (!isToolName(name)) throw new ToolError("not_found", `unknown tool ${name}`);
   const parsed = toolInputs[name].safeParse(input ?? {});
   if (!parsed.success) throw new ToolError("bad_input", parsed.error.message);
-  const handler = createHandlers(store)[name] as (input: unknown) => Promise<unknown>;
+  const model = opts.model === undefined ? defaultModel() : (opts.model ?? undefined);
+  const handler = createHandlers(store, { model })[name] as (input: unknown) => Promise<unknown>;
   return handler(parsed.data);
 }
 
-export { createHandlers, ToolError } from "./handlers.js";
+export { createHandlers, ToolError, type HandlerOptions, type ReviewItem } from "./handlers.js";
 export { ingest, knownThreads } from "./ingest.js";
 export { ConflictError, type Store, type BrainWrite, type ProjectWithCounts } from "./store.js";
 export { SupabaseStore } from "./supabase-store.js";

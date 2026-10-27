@@ -56,6 +56,20 @@ export function withNote(explanation: string, note: string): string {
   return `${explanation.replace(/\.$/, "")} (note: ${note}).`;
 }
 
+/** Part C: the model thinks an event may break the claim. Usman decides. */
+export function explainModelCheck(event: Event, verdict: "yes" | "unsure", quote: string): string {
+  const what =
+    event.kind === "email_received"
+      ? `an email from ${event.from ?? "someone"}`
+      : event.kind === "email_sent"
+        ? "an email you sent"
+        : event.kind === "doc_edited"
+          ? "a doc edit"
+          : "a note";
+  const judged = verdict === "yes" ? "says this is no longer true" : "can't tell if this still holds";
+  return `Sent to REVIEW because a model check of ${what} at ${formatTime(event.occurred_at)} ${judged}: "${quote.replace(/[.!?]+$/, "")}".`;
+}
+
 /** A model read new text and thinks it contradicts the claim. Usman decides. */
 export function explainContradicted(sourceTitle: string, quote: string): string {
   return `Sent to REVIEW because ${sourceTitle} said: "${quote.replace(/[.!?]+$/, "")}".`;
