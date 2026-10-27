@@ -11,11 +11,12 @@ import { MUSE_SPARK, type JsonCallOptions } from "../meta/client.js";
 import type { NewClaim, NewReason } from "../tools.js";
 import { normalizeAddress } from "./invalidate.js";
 
-export const EXTRACT_PROMPT = "extract.v5";
+export const EXTRACT_PROMPT = "extract.v6";
 const MAX_CLAIMS = 20;
 const QUOTE_MAX = 200;
 const MAX_THREADS = 50;
 const SUMMARY_MAX = 600;
+const TITLE_MAX = 80; // the prompt asks for 60; leave room before cutting
 const SUBJECT_MAX = 120;
 
 /** What extraction needs from a model client. MetaClient fits; tests pass a fake. */
@@ -54,6 +55,7 @@ export interface ExtractResult {
   dropped: Dropped[];
   summary: string; // what the text reports happened; empty if the model call failed
   mentions: string[]; // ids of current claims the text talks about without changing them
+  title: string; // a short name for the session or doc; empty if the model call failed
   extracted_by: string; // model id plus prompt version
 }
 
@@ -107,6 +109,7 @@ const ModelOutput = z.object({
   contradicts: z.array(z.object({ ref: z.string(), quote: z.string() })),
   summary: z.string().catch(""), // older answers and test fakes may leave it out
   mentions: z.array(z.string()).catch([]),
+  title: z.string().catch(""),
 });
 type ModelOutput = z.infer<typeof ModelOutput>;
 type ModelReason = z.infer<typeof ModelReason>;
@@ -148,6 +151,7 @@ export const EXTRACT_JSON_SCHEMA = object({
   contradicts: { type: "array", items: object({ ref: str, quote: str }) },
   summary: str,
   mentions: { type: "array", items: str },
+  title: str,
 });
 
 // ---- Prompt files live in /prompts, versioned, so evals can compare them.
@@ -291,7 +295,8 @@ export function checkExtraction(out: ModelOutput, input: ExtractInput): Omit<Ext
   // Mentioned claims are still in use; contradicted and same_as claims are handled already.
   const handled = new Set([...contradicts.map((c) => c.claim_id), ...claims.flatMap((c) => (c.same_as ? [c.same_as] : []))]);
   const mentions = [...new Set((out.mentions ?? []).map((r) => ctx.existing.get(r)).filter((id): id is string => !!id && !handled.has(id)))];
-  return { claims, contradicts, dropped, summary: (out.summary ?? "").trim().slice(0, SUMMARY_MAX), mentions };
+  const title = (out.title ?? "").replace(/["\u201c\u201d]/g, "").replace(/\s+/g, " ").trim().slice(0, TITLE_MAX);
+  return { claims, contradicts, dropped, summary: (out.summary ?? "").trim().slice(0, SUMMARY_MAX), mentions, title };
 }
 
 /** Extract claims from one chunk of text. Retries the model call once, then gives up and reports it. */
@@ -322,6 +327,7 @@ export async function extractClaims(model: JsonModel, input: ExtractInput, model
     dropped: [{ text: "(whole text)", why: `extraction failed twice: ${lastError}` }],
     summary: "",
     mentions: [],
+    title: "",
     extracted_by,
   };
 }

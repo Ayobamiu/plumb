@@ -59,10 +59,16 @@ export class MemoryStore implements Store {
     return copy(this.sources.find((s) => s.id === id));
   }
 
+  async loadSources(ids: string[]) {
+    return this.sources.filter((s) => ids.includes(s.id)).map(copy);
+  }
+
   async loadClaims(filter: ClaimFilter = {}) {
     return [...this.claims.values()]
       .filter((c) => !filter.ids || filter.ids.includes(c.id))
       .filter((c) => !filter.project_id || c.project_id === filter.project_id)
+      .filter((c) => !filter.source_ids || filter.source_ids.includes(c.source_id))
+      .filter((c) => !filter.recorded_after || Date.parse(c.recorded_at) > Date.parse(filter.recorded_after))
       .map(copy);
   }
 
@@ -78,6 +84,7 @@ export class MemoryStore implements Store {
       .filter((e) => filter.kinds.includes(e.kind))
       .filter((e) => !filter.after || Date.parse(e.occurred_at) > Date.parse(filter.after))
       .filter((e) => !filter.observed_after || Date.parse(e.observed_at) > Date.parse(filter.observed_after))
+      .filter((e) => !filter.source_ids || filter.source_ids.includes(e.source_id))
       .map(copy);
   }
 

@@ -163,3 +163,29 @@ export const ListLinkSuggestionsOutput = z.object({
 
 export const ResolveLinkSuggestionInput = z.object({ id: z.string(), action: z.enum(["accept", "dismiss"]) });
 export const ResolveLinkSuggestionOutput = z.object({ suggestion: LinkSuggestionRow });
+
+// find_context / get_context and the MCP resources (added Oct 27, Usman OK'd):
+// "@ a session from any tool". Each recent source is one entry.
+export const ContextEntry = z.object({
+  uri: z.string(), // cursor://auth-refactor-3f9a1c2d
+  name: z.string(), // "Cursor: Auth refactor, login page next (Oct 27)"
+  description: z.string(), // the latest summary, short
+  source_id: z.string(),
+  project_id: z.string().optional(), // from the claims it produced; none for e.g. email threads
+  tool: z.string(), // "Cursor", "Claude Code", ...
+  title: z.string().optional(),
+  last_at: Timestamp,
+});
+export type ContextEntry = z.infer<typeof ContextEntry>;
+
+export const FindContextInput = z.object({
+  query: z.string().min(1), // e.g. "cursor auth refactor"; every word must match the tool, title or summary
+  project_id: z.string().optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+export const FindContextOutput = z.object({ contexts: z.array(ContextEntry) });
+
+export const GetContextInput = z
+  .object({ uri: z.string().optional(), source_id: z.string().optional() })
+  .refine((x) => x.uri || x.source_id, "give uri or source_id");
+export const GetContextOutput = z.object({ uri: z.string(), name: z.string(), markdown: z.string() });

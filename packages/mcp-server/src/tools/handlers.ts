@@ -25,6 +25,8 @@ import {
   type Event,
   type JsonModel,
   type ExplainClaimInput,
+  type FindContextInput,
+  type GetContextInput,
   type ExplainClaimOutput,
   type GetProjectStateInput,
   type GetProjectStateOutput,
@@ -38,6 +40,7 @@ import {
   type ResolveReviewOutput,
   type Transition,
 } from "@plumb/core";
+import { findContext, readContext } from "./contexts.js";
 import { ConflictError, type ClaimUpdate, type Store } from "./store.js";
 
 export class ToolError extends Error {
@@ -149,6 +152,15 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
   return {
     review,
     mention,
+
+    // "@ a session from any tool" (added Oct 27).
+    async find_context(input: z.infer<typeof FindContextInput>) {
+      return findContext(store, input);
+    },
+
+    async get_context(input: z.infer<typeof GetContextInput>) {
+      return readContext(store, input);
+    },
 
     async list_projects(): Promise<z.infer<typeof ListProjectsOutput>> {
       return { projects: await store.listProjects() };

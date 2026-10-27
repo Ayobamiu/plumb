@@ -24,6 +24,8 @@ export type NewLinkSuggestion = Pick<LinkSuggestionRow, "project_id" | "claim_id
 export interface ClaimFilter {
   ids?: string[];
   project_id?: string;
+  source_ids?: string[]; // claims written from these sources
+  recorded_after?: string;
 }
 
 export interface ReasonFilter {
@@ -35,6 +37,7 @@ export interface EventFilter {
   kinds: EventKind[];
   after?: string; // occurred_at after this time
   observed_after?: string; // observed_at after this time
+  source_ids?: string[];
 }
 
 export interface TransitionFilter {
@@ -48,6 +51,7 @@ export interface Store {
   getProject(id: string): Promise<Project | undefined>;
   upsertSource(source: Omit<Source, "id">): Promise<Source>;
   getSource(id: string): Promise<Source | undefined>;
+  loadSources(ids: string[]): Promise<Source[]>;
   loadClaims(filter?: ClaimFilter): Promise<Claim[]>;
   loadReasons(filter?: ReasonFilter): Promise<Reason[]>;
   /** Events of these kinds that happened after `after`, and/or that we saw after `observed_after`. */

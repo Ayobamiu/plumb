@@ -12,6 +12,8 @@
 import {
   MetaClient,
   ExplainClaimInput,
+  FindContextInput,
+  GetContextInput,
   GetProjectStateInput,
   ListProjectsInput,
   RecordClaimsInput,
@@ -29,6 +31,8 @@ export const toolInputs = {
   record_event: RecordEventInput,
   explain_claim: ExplainClaimInput,
   resolve_review: ResolveReviewInput,
+  find_context: FindContextInput,
+  get_context: GetContextInput,
 } as const;
 
 export type ToolName = keyof typeof toolInputs;
@@ -43,6 +47,10 @@ export const toolDescriptions: Record<ToolName, string> = {
   record_event: "Log something that happened (an email, a doc edit, a clock tick), then run invalidation.",
   explain_claim: "The reason chain and full status history for one claim.",
   resolve_review: "Usman's decision on a claim: confirm_out, restore_in, or edit its text.",
+  find_context:
+    "Find a recent session, chat, doc or email thread from any of Usman's tools (Claude Code, Cursor, Claude chat, docs, Gmail) by tool and title words, e.g. 'cursor auth refactor'. Use when Usman refers to work done in another tool. Then call get_context with the uri.",
+  get_context:
+    "Get what a session from another tool said, and what of it is still true now: what happened, what it decided and planned (still true / no longer true and why / waiting for review), and what changed since. Pass the uri from find_context or an @ mention.",
 };
 
 export function isToolName(name: string): name is ToolName {
@@ -71,6 +79,7 @@ export async function callTool(
 
 export { createHandlers, ToolError, type HandlerOptions, type ReviewItem } from "./handlers.js";
 export { ingest } from "./ingest.js";
+export { findContext, listContexts, readContext } from "./contexts.js";
 export { knownThreads } from "@plumb/core"; // moved to core; kept here for existing imports
 export { sweep, type SweepResult } from "./sweep.js";
 export { listLinkSuggestions, resolveLinkSuggestion } from "./links.js";

@@ -12,6 +12,7 @@ import type { z } from "zod";
 import {
   explainContradicted,
   extractClaims,
+  isGenericTitle,
   knownThreads,
   type IngestInput,
   type IngestOutput,
@@ -54,12 +55,17 @@ export async function ingest(
     threads: knownThreads(emails),
   });
 
+  // The tool's own title wins (e.g. a Cursor conversation title); otherwise the one extraction wrote.
+  const nativeTitle = input.source.title?.trim();
+  const title = nativeTitle && !isGenericTitle(nativeTitle) ? nativeTitle : result.title || nativeTitle;
+  const source = { ...input.source, ...(title && { title }) };
+
   const handlers = createHandlers(store, { model });
   const text = input.text.trim();
   const summary = result.summary || (text.length > FALLBACK_SUMMARY ? `...${text.slice(-FALLBACK_SUMMARY)}` : text);
   const recordedEvent = await handlers.record_event({
-    kind: input.source.kind === "doc" ? "doc_edited" : "session_note",
-    source: input.source,
+    kind: source.kind === "doc" ? "doc_edited" : "session_note",
+    source,
     occurred_at: input.at ?? now,
     summary: summary.slice(0, 1000),
   });
@@ -67,12 +73,12 @@ export async function ingest(
   const recorded = result.claims.length
     ? await handlers.record_claims({
         project_id: project.id,
-        source: input.source,
+        source,
         extracted_by: result.extracted_by,
         claims: result.claims,
       })
     : { claims: [], reasons: [], id_map: {} };
-  const sourceTitle = input.source.title ? `"${input.source.title}"` : `a ${input.source.kind.replace("_", " ")} note`;
+  const sourceTitle = source.title ? `"${source.title}"` : `a ${source.kind.replace("_", " ")} note`;
   const review = await handlers.review(
     result.contradicts.map((c) => ({ claim_id: c.claim_id, explanation: explainContradicted(sourceTitle, c.quote) })),
   );

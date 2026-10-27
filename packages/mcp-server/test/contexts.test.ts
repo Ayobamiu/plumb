@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+import type { JsonModel } from "@plumb/core";
+import { callTool, ingest, listContexts, MemoryStore, readContext } from "../src/tools/index.js";
+
+const extraction = (title: string, claims: unknown[] = []) => ({ claims, contradicts: [], summary: `Summary: ${title}.`, mentions: [], title });
+const model = (out: unknown): JsonModel => ({
+  async json(opts) {
+    if (opts.schemaName === "verdict") return opts.parse.parse({ verdict: "no", quote: null, why: "" }) as never;
+    return opts.parse.parse(out) as never;
+  },
+});
+const reason = (x: Record<string, unknown>) => ({ type: "until", event_kind: null, from: null, thread_id: null, text_hint: null, since: null, at: "2027-01-01T00:00:00Z", claim_ref: null, ...x });
+const newClaim = (ref: string, text: string, extra: Record<string, unknown> = {}) => ({ ref, text, kind: "status", valid_from: null, confidence: 1, same_as: null, reasons: [reason({})], ...extra });
+
+async function setup() {
+  const store = new MemoryStore();
+  const project = store.addProject("Meta hackathon");
+  const other = store.addProject("Other");
+  // A Claude Code session: the hook sends a generic title, so the generated one is used.
+  await ingest(store, model(extraction("Auth refactor: middleware done", [newClaim("n1", "All tests pass on main")])), {
+    project_id: project.id,
+    source: { kind: "claude_code", external_id: "cc-1", title: "Claude Code session" },
+    text: "Finished the auth middleware; tests pass on main.",
+  });
+  // A Cursor conversation with its own title: that one wins.
+  await ingest(store, model(extraction("Something generated", [newClaim("n1", "Login page ships Friday", { kind: "next_step" })])), {
+    project_id: project.id,
+    source: { kind: "cursor", external_id: "conv-9", title: "Login page wiring" },
+    text: "Wired the login page.",
+  });
+  // A session from another project.
+  await ingest(store, model(extraction("Billing export")), { project_id: other.id, source: { kind: "cursor", external_id: "conv-x" }, text: "Billing." });
+  return { store, project, other };
+}
+
+describe("contexts", () => {
+  it("lists recent sessions with tool-prefixed names and real titles, per project, newest first", async () => {
+    const { store, project } = await setup();
+    const list = await listContexts(store, { project_id: project.id });
+    expect(list.map((c) => c.name.replace(/ \(.*\)$/, ""))).toEqual(["Cursor: Login page wiring", "Claude Code: Auth refactor: middleware done"]);
+    expect(list[1]!.uri).toMatch(/^claude-code:\/\/auth-refactor-middleware-done-[0-9a-f]{8}$/);
+    expect(list[1]!.description).toBe("Summary: Auth refactor: middleware done.");
+    expect((await listContexts(store, { project_id: project.id, query: "claude auth" })).map((c) => c.tool)).toEqual(["Claude Code"]);
+  });
+
+  it("reads a session by its @ uri as the current view: a claim that went OUT since shows with why", async () => {
+    const { store, project } = await setup();
+    const [cc] = await listContexts(store, { project_id: project.id, query: "claude" });
+    const testsClaim = [...store.claims.values()].find((c) => c.text === "All tests pass on main")!;
+    await callTool(store, "resolve_review", { claim_id: testsClaim.id, action: "confirm_out", note: "CI is red" }, { model: null });
+
+    const out = await readContext(store, { uri: cc!.uri });
+    expect(out.name).toMatch(/^Claude Code: Auth refactor: middleware done/);
+    expect(out.markdown).toContain("## What happened");
+    expect(out.markdown).toContain("## No longer true\n\n- [status] All tests pass on main. Went OUT because Usman confirmed it is no longer true (note: CI is red).");
+    await expect(readContext(store, { uri: "cursor://nothing-deadbeef" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("works through the tools any MCP client calls: find_context then get_context", async () => {
+    const { store } = await setup();
+    const found: any = await callTool(store, "find_context", { query: "cursor login" }, { model: null });
+    expect(found.contexts).toHaveLength(1);
+    const got: any = await callTool(store, "get_context", { uri: found.contexts[0].uri }, { model: null });
+    expect(got.markdown).toContain("## Still true\n\n- [next step] Login page ships Friday");
+    await expect(callTool(store, "get_context", {}, { model: null })).rejects.toMatchObject({ code: "bad_input" });
+  });
+});
+
+describe("contexts: email threads", () => {
+  it("shows a thread only if it matters (a current claim waits on it), never a newsletter", async () => {
+    const { store, project } = await setup();
+    const email = (thread: string, summary: string) =>
+      callTool(store, "record_event", { kind: "email_received", source: { kind: "gmail_thread", external_id: thread, title: summary }, occurred_at: new Date().toISOString(), from: "x@y.com", thread_id: thread, summary }, { model: null });
+    await callTool(store, "record_claims", {
+      project_id: project.id,
+      source: { kind: "claude_code", external_id: "cc-2" },
+      extracted_by: "t",
+      claims: [{ text: "No reply from Priya on the contract", kind: "status", valid_from: "2026-10-25T00:00:00Z", reasons: [{ type: "absence", since: "2026-10-25T00:00:00Z", pattern: { event_kind: "email_received", from: "priya@x.org", thread_id: "t-contract" } }] }],
+    }, { model: null });
+    await email("t-contract", "Contract: looping in legal");
+    await email("t-news", "This week in AI tooling");
+    const titles = (await listContexts(store, { project_id: project.id })).filter((c) => c.tool === "Email").map((c) => c.title);
+    expect(titles).toEqual(["Contract: looping in legal"]);
+  });
+});

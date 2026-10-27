@@ -101,16 +101,27 @@ export class SupabaseStore implements Store {
     return row && toSource(row);
   }
 
+  async loadSources(ids: string[]) {
+    const rows = await byIds(ids, (chunk) => pages((a, b) => this.db.from("sources").select("*").in("id", chunk).order("id").range(a, b)));
+    return rows.map(toSource);
+  }
+
   async loadClaims(filter: ClaimFilter = {}) {
     if (filter.project_id && !UUID.test(filter.project_id)) return [];
-    const run = (ids?: string[]) =>
+    const run = (ids?: string[], sourceIds?: string[]) =>
       pages((a, b) => {
         let q = this.db.from("claims").select("*");
         if (filter.project_id) q = q.eq("project_id", filter.project_id);
+        if (filter.recorded_after) q = q.gt("recorded_at", filter.recorded_after);
         if (ids) q = q.in("id", ids);
+        if (sourceIds) q = q.in("source_id", sourceIds);
         return q.order("id").range(a, b);
       });
-    const rows = filter.ids ? await byIds(filter.ids, run) : await run();
+    const rows = filter.ids
+      ? await byIds(filter.ids, (ids) => run(ids))
+      : filter.source_ids
+        ? await byIds(filter.source_ids, (ids) => run(undefined, ids))
+        : await run();
     return rows.map(toClaim);
   }
 
@@ -137,6 +148,7 @@ export class SupabaseStore implements Store {
       let q = this.db.from("events").select("*").in("kind", filter.kinds);
       if (filter.after) q = q.gt("occurred_at", filter.after);
       if (filter.observed_after) q = q.gt("observed_at", filter.observed_after);
+      if (filter.source_ids) q = q.in("source_id", filter.source_ids.filter((id) => UUID.test(id)).slice(0, CHUNK));
       return q.order("id").range(a, b);
     });
     return rows.map(toEvent);
