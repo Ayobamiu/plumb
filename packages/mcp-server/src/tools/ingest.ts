@@ -7,6 +7,7 @@
 // 2. record_claims writes the new claims. They come after the event, so a
 //    claim is never flagged by the text that created it.
 // 3. Current claims the text contradicts go to REVIEW.
+// 4. Current claims the text talks about get last_mentioned_at, for the quiet rule.
 import type { z } from "zod";
 import {
   explainContradicted,
@@ -75,6 +76,10 @@ export async function ingest(
   const review = await handlers.review(
     result.contradicts.map((c) => ({ claim_id: c.claim_id, explanation: explainContradicted(sourceTitle, c.quote) })),
   );
+
+  // Claims the text talked about, or added a reason to, are still in use.
+  const sameAs = result.claims.flatMap((c) => (c.same_as ? [c.same_as] : []));
+  await handlers.mention([...result.mentions, ...sameAs], input.at ?? now);
 
   return {
     ...recorded,

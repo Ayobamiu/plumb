@@ -7,6 +7,7 @@ import {
   type BrainWrite,
   type ClaimFilter,
   type EventFilter,
+  type NewLinkSuggestion,
   type ProjectWithCounts,
   type ReasonFilter,
   type Store,
@@ -96,11 +97,25 @@ export class MemoryStore implements Store {
       .map(copy);
   }
 
-  async addLinkSuggestions(rows: Omit<LinkSuggestionRow, "id" | "status" | "created_at" | "resolved_at">[]) {
+  async addLinkSuggestions(rows: NewLinkSuggestion[]) {
     for (const r of rows) {
-      if (this.links.some((l) => l.claim_id === r.claim_id && l.depends_on === r.depends_on)) continue;
-      this.links.push({ ...r, id: randomUUID(), status: "pending", created_at: new Date().toISOString() });
+      const found = this.links.find((l) => l.claim_id === r.claim_id && l.depends_on === r.depends_on);
+      if (!found) {
+        this.links.push({ ...r, id: randomUUID(), status: "pending", created_at: new Date().toISOString() });
+      } else if (found.status === "expired" && found.expired_because === "claim_left_in") {
+        Object.assign(found, { status: "pending", why: r.why, created_at: new Date().toISOString() });
+        delete found.resolved_at;
+        delete found.expired_because;
+        delete found.expired_note;
+      }
     }
+  }
+
+  async expireLinkSuggestion(id: string, note: string, at: string) {
+    const l = this.links.find((x) => x.id === id);
+    if (!l || l.status !== "pending") return false;
+    Object.assign(l, { status: "expired", expired_because: "no_longer_relevant", expired_note: note, resolved_at: at });
+    return true;
   }
 
   async resolveLinkSuggestion(id: string, status: "accepted" | "dismissed", at: string) {
@@ -128,7 +143,16 @@ export class MemoryStore implements Store {
     if (write.event) this.events.push(copy(write.event));
     for (const c of write.claims ?? []) this.claims.set(c.id, copy(c));
     this.reasons.push(...(write.reasons ?? []).map(copy));
-    for (const u of write.updates) this.claims.set(u.claim.id, copy(u.claim));
+    for (const u of write.updates) {
+      // Same as the DB trigger: pending suggestions on a claim that leaves IN expire.
+      if (u.expected_status === "IN" && u.claim.status !== "IN") {
+        for (const l of this.links) {
+          if (l.status !== "pending" || (l.claim_id !== u.claim.id && l.depends_on !== u.claim.id)) continue;
+          Object.assign(l, { status: "expired", expired_because: "claim_left_in", expired_note: `"${u.claim.text}" went ${u.claim.status}.`, resolved_at: new Date().toISOString() });
+        }
+      }
+      this.claims.set(u.claim.id, copy(u.claim));
+    }
     this.transitions.push(...write.transitions.map(copy));
   }
 }

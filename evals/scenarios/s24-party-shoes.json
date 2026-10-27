@@ -1,0 +1,63 @@
+{
+  "id": "s24",
+  "title": "Relevance: the shoe choice and the table booking only matter until Dana's dinner (Sat Oct 31, 7 PM ET). After it, both go OUT on the clock; the lasting fact about Dana's favorite restaurant stays IN.",
+  "split": "dev",
+  "recorded_at": "2026-10-28T14:00:00Z",
+  "texts": [
+    {
+      "key": "chat",
+      "at": "2026-10-28T14:00:00Z",
+      "source": {
+        "kind": "claude_chat",
+        "external_id": "chat-9",
+        "title": "Claude chat"
+      },
+      "text": "For Dana's birthday dinner this Saturday, Oct 31 at 7 PM, I still need to pick between the red or the white shoes. I also need to book a table for 8 at Luca before then. Good to remember: Luca is Dana's favorite restaurant."
+    }
+  ],
+  "find": {
+    "shoes": [
+      "shoe"
+    ],
+    "table": [
+      "table"
+    ],
+    "luca_fact": [
+      "favorite"
+    ]
+  },
+  "events": [
+    {
+      "key": "saturday_afternoon",
+      "kind": "clock",
+      "occurred_at": "2026-10-31T20:00:00Z",
+      "summary": "tick"
+    },
+    {
+      "key": "sunday_morning",
+      "kind": "clock",
+      "occurred_at": "2026-11-01T15:00:00Z",
+      "summary": "tick"
+    }
+  ],
+  "expected": [
+    {
+      "after": "chat",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "saturday_afternoon",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "sunday_morning",
+      "status": {
+        "shoes": "OUT",
+        "table": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

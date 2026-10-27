@@ -45,6 +45,7 @@ export const Claim = z.object({
   retracted_at: Timestamp.optional(), // when we marked it OUT
   extracted_by: z.string(), // model id or tool name
   confidence: z.number().min(0).max(1).optional(), // 0 to 1, from extraction
+  last_mentioned_at: Timestamp.optional(), // when a text last talked about it without changing it (added Oct 27)
 });
 export type Claim = z.infer<typeof Claim>;
 

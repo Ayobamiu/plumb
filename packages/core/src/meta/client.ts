@@ -45,12 +45,36 @@ export interface JsonCallOptions<T> {
   model?: string;
 }
 
+// Meta's API sometimes answers 404 "model not found" (and, like any API, 429
+// or 5xx) for a few seconds at a time; on Oct 27 about 4% of calls failed that
+// way. Those are retried. A bad answer (schema mismatch, no output) is not:
+// callers decide whether to ask again.
+const TRANSIENT_STATUS = new Set([404, 408, 429, 500, 502, 503, 504]);
+
+class TransientError extends Error {}
+
 export class MetaClient {
-  constructor(private apiKey = process.env.META_MODEL_API_KEY) {
+  constructor(
+    private apiKey = process.env.META_MODEL_API_KEY,
+    private retryDelaysMs: number[] = [1000, 3000], // waits before the 2nd and 3rd attempts
+  ) {
     if (!this.apiKey) throw new Error("META_MODEL_API_KEY is not set");
   }
 
   async json<T>(opts: JsonCallOptions<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.attempt(opts);
+      } catch (err) {
+        const wait = this.retryDelaysMs[attempt];
+        if (!(err instanceof TransientError) || wait === undefined) throw err;
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      }
+    }
+  }
+
+  /** One request, one log line. */
+  private async attempt<T>(opts: JsonCallOptions<T>): Promise<T> {
     const model = opts.model ?? MUSE_SPARK;
     const effort = opts.effort ?? "low";
     const started = Date.now();
@@ -68,23 +92,29 @@ export class MetaClient {
       ok: false,
     };
     try {
-      const res = await fetch(`${META_BASE_URL}/responses`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          input: [
-            { role: "developer", content: opts.developer },
-            { role: "user", content: opts.user },
-          ],
-          reasoning: { effort },
-          store: false,
-          text: { format: { type: "json_schema", name: opts.schemaName, strict: true, schema: opts.jsonSchema } },
-        }),
-      });
-      const body = (await res.json()) as ResponsesBody;
+      let res: Response;
+      try {
+        res = await fetch(`${META_BASE_URL}/responses`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            input: [
+              { role: "developer", content: opts.developer },
+              { role: "user", content: opts.user },
+            ],
+            reasoning: { effort },
+            store: false,
+            text: { format: { type: "json_schema", name: opts.schemaName, strict: true, schema: opts.jsonSchema } },
+          }),
+        });
+      } catch (err) {
+        throw new TransientError(`Meta API unreachable: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const body = (await res.json().catch(() => ({}))) as ResponsesBody;
       if (!res.ok || body.error) {
-        throw new Error(`Meta API ${res.status}: ${body.error?.message ?? "unknown error"}`);
+        const message = `Meta API ${res.status}: ${body.error?.message ?? "unknown error"}`;
+        throw TRANSIENT_STATUS.has(res.status) ? new TransientError(message) : new Error(message);
       }
       log.response_id = body.id;
       log.input_tokens = body.usage?.input_tokens ?? 0;

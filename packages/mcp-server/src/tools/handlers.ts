@@ -132,8 +132,22 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
     });
   }
 
+  /** Not an MCP tool: mark claims as just talked about (last_mentioned_at), without changing them. */
+  async function mention(claimIds: string[], at: string): Promise<void> {
+    const ids = [...new Set(claimIds)];
+    if (ids.length === 0) return;
+    await withRetry(async () => {
+      const claims = await store.loadClaims({ ids });
+      const updates = claims
+        .filter((c) => !c.last_mentioned_at || Date.parse(c.last_mentioned_at) < Date.parse(at))
+        .map((c) => ({ claim: { ...c, last_mentioned_at: at }, expected_status: c.status }));
+      if (updates.length) await store.apply({ updates, transitions: [] });
+    });
+  }
+
   return {
     review,
+    mention,
 
     async list_projects(): Promise<z.infer<typeof ListProjectsOutput>> {
       return { projects: await store.listProjects() };

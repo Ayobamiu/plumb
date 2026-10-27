@@ -57,7 +57,10 @@ export async function sweep(store: Store, model: JsonModel): Promise<SweepResult
     const c = state.claims.get(t.claim_id);
     if (c) state.claims.set(c.id, { ...c, status: t.to_status });
   }
-  const known = new Set(suggested.map((l) => `${l.claim_id}>${l.depends_on}`));
+  // A pair that expired only because a claim left IN may be suggested again once both are IN.
+  const known = new Set(
+    suggested.filter((l) => l.expired_because !== "claim_left_in").map((l) => `${l.claim_id}>${l.depends_on}`),
+  );
   const links = await suggestLinks(model, state, known);
   await store.addLinkSuggestions(
     links.map((l) => ({ ...l, project_id: state.claims.get(l.claim_id)!.project_id })),

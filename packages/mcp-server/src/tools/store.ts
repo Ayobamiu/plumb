@@ -19,6 +19,8 @@ export interface BrainWrite {
   transitions: Transition[];
 }
 
+export type NewLinkSuggestion = Pick<LinkSuggestionRow, "project_id" | "claim_id" | "depends_on" | "why">;
+
 export interface ClaimFilter {
   ids?: string[];
   project_id?: string;
@@ -57,7 +59,10 @@ export interface Store {
   setCursor(name: string, value: string): Promise<void>;
   /** Link suggestions from the sweep (link_suggestions), newest first. */
   loadLinkSuggestions(filter?: { project_id?: string; status?: LinkSuggestionRow["status"] }): Promise<LinkSuggestionRow[]>;
-  addLinkSuggestions(rows: Omit<LinkSuggestionRow, "id" | "status" | "created_at" | "resolved_at">[]): Promise<void>;
+  /** New pairs are added; a pair that expired because a claim left IN comes back as pending; others are skipped. */
+  addLinkSuggestions(rows: NewLinkSuggestion[]): Promise<void>;
+  /** The relevance pass: a pending suggestion is moot. False if it wasn't pending. */
+  expireLinkSuggestion(id: string, note: string, at: string): Promise<boolean>;
   /** Move a pending suggestion to accepted or dismissed. False if it wasn't pending. */
   resolveLinkSuggestion(id: string, status: "accepted" | "dismissed", at: string): Promise<boolean>;
   /** Throws ConflictError if a claim's status is no longer expected_status. */

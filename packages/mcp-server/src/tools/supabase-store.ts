@@ -8,6 +8,7 @@ import {
   type BrainWrite,
   type ClaimFilter,
   type EventFilter,
+  type NewLinkSuggestion,
   type ProjectWithCounts,
   type ReasonFilter,
   type Store,
@@ -152,11 +153,37 @@ export class SupabaseStore implements Store {
     return rows.map((r) => clean(r) as unknown as LinkSuggestionRow);
   }
 
-  async addLinkSuggestions(rows: Omit<LinkSuggestionRow, "id" | "status" | "created_at" | "resolved_at">[]) {
+  async addLinkSuggestions(rows: NewLinkSuggestion[]) {
     if (rows.length === 0) return;
-    // A pair suggested before (in any status) is skipped, not an error.
+    // New pairs only; a pair already there (any status) is skipped, not an error.
     const { error } = await this.db.from("link_suggestions").upsert(rows, { onConflict: "claim_id,depends_on", ignoreDuplicates: true });
     if (error) throw new Error(`supabase: ${error.message}`);
+    // A pair that expired only because a claim left IN can come back.
+    for (const r of rows) {
+      check(
+        await this.db
+          .from("link_suggestions")
+          .update({ status: "pending", why: r.why, created_at: new Date().toISOString(), resolved_at: null, expired_because: null, expired_note: null })
+          .eq("claim_id", r.claim_id)
+          .eq("depends_on", r.depends_on)
+          .eq("status", "expired")
+          .eq("expired_because", "claim_left_in")
+          .select("id"),
+      );
+    }
+  }
+
+  async expireLinkSuggestion(id: string, note: string, at: string) {
+    if (!UUID.test(id)) return false;
+    const rows = check(
+      await this.db
+        .from("link_suggestions")
+        .update({ status: "expired", expired_because: "no_longer_relevant", expired_note: note, resolved_at: at })
+        .eq("id", id)
+        .eq("status", "pending")
+        .select("id"),
+    );
+    return rows.length === 1;
   }
 
   async resolveLinkSuggestion(id: string, status: "accepted" | "dismissed", at: string) {
@@ -204,6 +231,7 @@ export class SupabaseStore implements Store {
         valid_to: claim.valid_to ?? null,
         retracted_at: claim.retracted_at ?? null,
         text: claim.text,
+        last_mentioned_at: claim.last_mentioned_at ?? null,
       })),
       p_transitions: write.transitions,
     });

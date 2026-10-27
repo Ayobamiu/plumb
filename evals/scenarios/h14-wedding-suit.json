@@ -1,0 +1,75 @@
+{
+  "id": "h14",
+  "title": "Relevance (held-out): choosing the suit and sending the RSVP only matter until their moments pass (RSVP by Mon Nov 2, wedding Sat Nov 7). The fact about the venue stays IN.",
+  "split": "heldout",
+  "recorded_at": "2026-10-29T13:00:00Z",
+  "texts": [
+    {
+      "key": "note",
+      "at": "2026-10-29T13:00:00Z",
+      "source": {
+        "kind": "cursor",
+        "external_id": "cur-12",
+        "title": "Cursor session"
+      },
+      "text": "Personal note before I forget: Sam and Lee's wedding is Saturday, Nov 7. I have to send the RSVP by Monday, Nov 2, and I still haven't decided between the navy or the grey suit. The venue is the Old Mill in Hudson."
+    }
+  ],
+  "find": {
+    "rsvp": [
+      "rsvp"
+    ],
+    "suit": [
+      "suit"
+    ],
+    "venue": [
+      "mill"
+    ]
+  },
+  "events": [
+    {
+      "key": "tue_nov3",
+      "kind": "clock",
+      "occurred_at": "2026-11-03T15:00:00Z",
+      "summary": "tick"
+    },
+    {
+      "key": "fri_nov6",
+      "kind": "clock",
+      "occurred_at": "2026-11-06T15:00:00Z",
+      "summary": "tick"
+    },
+    {
+      "key": "sun_nov8",
+      "kind": "clock",
+      "occurred_at": "2026-11-08T15:00:00Z",
+      "summary": "tick"
+    }
+  ],
+  "expected": [
+    {
+      "after": "note",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "tue_nov3",
+      "status": {
+        "rsvp": "OUT"
+      },
+      "chain": []
+    },
+    {
+      "after": "fri_nov6",
+      "status": {},
+      "chain": []
+    },
+    {
+      "after": "sun_nov8",
+      "status": {
+        "suit": "OUT"
+      },
+      "chain": []
+    }
+  ]
+}

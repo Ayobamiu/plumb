@@ -133,7 +133,10 @@ export const IngestOutput = RecordClaimsOutput.extend({
 // Link suggestions (not MCP tools; the homepage lists them, Usman accepts or
 // dismisses). The sleep-time sweep writes them; accepting adds the depends_on
 // reason through record_claims, so the Contract tables are unchanged.
-export const LinkSuggestionStatus = z.enum(["pending", "accepted", "dismissed"]);
+// expired: the system retired it, never Usman. claim_left_in (a trigger, when
+// either claim leaves IN; may be suggested again later) or no_longer_relevant
+// (the sweep's relevance pass; not suggested again).
+export const LinkSuggestionStatus = z.enum(["pending", "accepted", "dismissed", "expired"]);
 export const LinkSuggestionRow = z.object({
   id: z.string(),
   project_id: z.string(),
@@ -143,6 +146,8 @@ export const LinkSuggestionRow = z.object({
   status: LinkSuggestionStatus,
   created_at: Timestamp,
   resolved_at: Timestamp.optional(),
+  expired_because: z.enum(["claim_left_in", "no_longer_relevant"]).optional(),
+  expired_note: z.string().optional(),
 });
 export type LinkSuggestionRow = z.infer<typeof LinkSuggestionRow>;
 

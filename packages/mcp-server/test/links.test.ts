@@ -64,15 +64,22 @@ describe("link suggestions", () => {
     expect(out.transitions.map((t: any) => [t.claim_id, t.depth])).toEqual([[testsId, 0], [deployId, 1]]);
   });
 
-  it("accepting a link to a claim that is already OUT knocks the dependent down right away", async () => {
-    const { store, project, testsId, deployId } = await setup();
+  it("expires on its own when a claim on either side leaves IN, and comes back if that claim is restored", async () => {
+    const { store, project, testsId } = await setup();
     await sweep(store, model);
     await callTool(store, "record_event", ciFails, { model: null });
     expect(store.claims.get(testsId)!.status).toBe("OUT");
-    const [s] = (await listLinkSuggestions(store, { project_id: project.id })).suggestions;
-    // The sweep ran before tests went OUT, so the suggestion is still there.
-    await resolveLinkSuggestion(store, { id: s!.id, action: "accept" });
-    expect(store.claims.get(deployId)!.status).toBe("OUT");
+    expect((await listLinkSuggestions(store, { project_id: project.id })).suggestions).toEqual([]);
+    expect(store.links[0]).toMatchObject({ status: "expired", expired_because: "claim_left_in", expired_note: '"All tests pass on main." went OUT.' });
+    await expect(resolveLinkSuggestion(store, { id: store.links[0]!.id, action: "accept" })).rejects.toBeInstanceOf(ToolError);
+
+    // Usman restores the claim: the next sweep may suggest the pair again.
+    await callTool(store, "resolve_review", { claim_id: testsId, action: "restore_in" }, { model: null });
+    const again = await sweep(store, model);
+    expect(again.links).toBe(1);
+    expect(store.links).toHaveLength(1);
+    expect(store.links[0]).toMatchObject({ status: "pending" });
+    expect(store.links[0]!.expired_because).toBeUndefined();
   });
 
   it("a dismissed pair is not suggested again, and a resolved suggestion can't be resolved twice", async () => {
