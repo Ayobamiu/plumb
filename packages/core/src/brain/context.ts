@@ -58,14 +58,21 @@ export function contextName(source: Source, lastAt: string): string {
   return `${toolLabel(source.kind)}: ${source.title?.trim() || "Untitled"} (${day(lastAt)})`;
 }
 
-/** Every query word must appear in the tool's names, the title or the latest summary. */
+/**
+ * Every query word must match. A word that names a tool ("cursor", "email",
+ * "claude") picks the tool; the other words must appear in the title or the
+ * latest summary. So "cursor redeploy" doesn't return a Claude Code session
+ * whose summary mentions Cursor.
+ */
 export function matchesQuery(source: Source, latestSummary: string, query: string): boolean {
-  const hay = [...TOOLS[source.kind].words, TOOLS[source.kind].label, source.title ?? "", latestSummary].join(" ").toLowerCase();
+  const toolWords = new Set(Object.values(TOOLS).flatMap((t) => t.words));
+  const own = new Set(TOOLS[source.kind].words);
+  const text = [source.title ?? "", latestSummary].join(" ").toLowerCase();
   return query
     .toLowerCase()
-    .split(/[^a-z0-9]+/)
+    .split(/[^a-z0-9-]+/)
     .filter((w) => w.length > 1)
-    .every((w) => hay.includes(w));
+    .every((w) => (toolWords.has(w) ? own.has(w) : text.includes(w)));
 }
 
 export interface ContextInput {

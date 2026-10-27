@@ -185,7 +185,11 @@ export const FindContextInput = z.object({
 });
 export const FindContextOutput = z.object({ contexts: z.array(ContextEntry) });
 
-export const GetContextInput = z
-  .object({ uri: z.string().optional(), source_id: z.string().optional() })
-  .refine((x) => x.uri || x.source_id, "give uri or source_id");
+// A plain object (no .refine): MCP clients only see inputs they can describe,
+// and a refined schema showed up with no inputs at all. "One of the two" is
+// checked in the handler.
+export const GetContextInput = z.object({
+  uri: z.string().optional(), // from find_context or an @ mention, e.g. cursor://auth-refactor-3f9a1c2d
+  source_id: z.string().optional(),
+});
 export const GetContextOutput = z.object({ uri: z.string(), name: z.string(), markdown: z.string() });

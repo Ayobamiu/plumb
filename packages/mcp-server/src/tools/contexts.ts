@@ -59,8 +59,9 @@ export async function listContexts(
   const summary = new Map<string, { at: string; text: string }>();
   for (const e of events) {
     last.set(e.source_id, later(last.get(e.source_id), e.occurred_at)!);
+    // Raw-text fallbacks (start with "...") from failed extractions aren't shown.
     const s = summary.get(e.source_id);
-    if (!s || Date.parse(e.occurred_at) > Date.parse(s.at)) summary.set(e.source_id, { at: e.occurred_at, text: e.summary });
+    if (!e.summary.startsWith("...") && (!s || Date.parse(e.occurred_at) > Date.parse(s.at))) summary.set(e.source_id, { at: e.occurred_at, text: e.summary });
   }
   for (const c of claims) last.set(c.source_id, later(last.get(c.source_id), c.recorded_at)!);
   if (last.size === 0) return [];
@@ -116,7 +117,8 @@ async function resolve(store: Store, input: z.infer<typeof GetContextInput>): Pr
     if (!s) throw new ToolError("not_found", `unknown source ${input.source_id}`);
     return s;
   }
-  const parsed = parseContextUri(input.uri!);
+  if (!input.uri) throw new ToolError("bad_input", "give uri or source_id");
+  const parsed = parseContextUri(input.uri);
   if (!parsed) throw new ToolError("bad_input", `not a Plumb context: ${input.uri}`);
   const hits = (await listContexts(store, { days: RESOLVE_DAYS, limit: 1000 })).filter((e) => e.source_id.startsWith(parsed.idPrefix));
   if (hits.length !== 1) throw new ToolError("not_found", hits.length ? `ambiguous context ${input.uri}` : `no recent context ${input.uri}`);

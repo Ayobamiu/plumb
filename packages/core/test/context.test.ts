@@ -17,6 +17,9 @@ describe("context names and addresses", () => {
     expect(matchesQuery({ ...source, kind: "claude_code" }, "", "claude code auth")).toBe(true);
     expect(matchesQuery({ ...source, kind: "gmail_thread", title: "LOI" }, "Avery replied", "email avery")).toBe(true);
     expect(matchesQuery(source, "", "cursor billing")).toBe(false);
+    // A tool word picks the tool, even if another tool's summary mentions it.
+    expect(matchesQuery({ ...source, kind: "claude_code", title: "Redeploy plan" }, "Asked Cursor to redeploy", "cursor redeploy")).toBe(false);
+    expect(matchesQuery({ ...source, kind: "claude_chat", title: "Pricing" }, "", "claude pricing")).toBe(true);
   });
 });
 
