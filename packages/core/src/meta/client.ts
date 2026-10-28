@@ -5,8 +5,14 @@ import { dirname } from "node:path";
 import type { z } from "zod";
 
 export const META_BASE_URL = "https://api.meta.ai/v1";
-// Confirmed via GET /v1/models on Oct 26, 2026.
-export const MUSE_SPARK = "muse-spark-1.3";
+// Default muse-spark-1.3. Override with META_MODEL_ID when this key's /v1/models list flips
+// (seen Oct 27: sometimes only *-contributor, sometimes only standard).
+// Never the contributor tier: it lets Meta train on our prompts, which carry
+// email summaries and personal chats (Usman, Oct 26 and again Oct 28). A
+// contributor id in META_MODEL_ID is ignored; if the standard model is
+// unavailable, calls fail and /ingest asks the caller to retry later.
+const configured = process.env.META_MODEL_ID?.trim();
+export const MUSE_SPARK = configured && !/contributor/i.test(configured) ? configured : "muse-spark-1.3";
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
