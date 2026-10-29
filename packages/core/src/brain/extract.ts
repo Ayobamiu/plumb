@@ -11,7 +11,7 @@ import { MUSE_SPARK, type JsonCallOptions } from "../meta/client.js";
 import type { NewClaim, NewReason } from "../tools.js";
 import { normalizeAddress } from "./invalidate.js";
 
-export const EXTRACT_PROMPT = "extract.v7";
+export const EXTRACT_PROMPT = "extract.v8";
 const MAX_CLAIMS = 20;
 const QUOTE_MAX = 200;
 const MAX_THREADS = 50;
@@ -56,6 +56,7 @@ export interface ExtractResult {
   summary: string; // what the text reports happened; empty if the model call failed
   mentions: string[]; // ids of current claims the text talks about without changing them
   title: string; // a short name for the session or doc; empty if the model call failed
+  personal: boolean; // about the user's personal life rather than work (extract.v8)
   extracted_by: string; // model id plus prompt version
 }
 
@@ -110,6 +111,7 @@ const ModelOutput = z.object({
   summary: z.string().catch(""), // older answers and test fakes may leave it out
   mentions: z.array(z.string()).catch([]),
   title: z.string().catch(""),
+  personal: z.boolean().catch(false), // extract.v8 (Oct 29): personal or work, as in index mode
 });
 type ModelOutput = z.infer<typeof ModelOutput>;
 type ModelReason = z.infer<typeof ModelReason>;
@@ -152,6 +154,7 @@ export const EXTRACT_JSON_SCHEMA = object({
   summary: str,
   mentions: { type: "array", items: str },
   title: str,
+  personal: { type: "boolean" },
 });
 
 // ---- Prompt files live in /prompts, versioned, so evals can compare them.
@@ -296,7 +299,7 @@ export function checkExtraction(out: ModelOutput, input: ExtractInput): Omit<Ext
   const handled = new Set([...contradicts.map((c) => c.claim_id), ...claims.flatMap((c) => (c.same_as ? [c.same_as] : []))]);
   const mentions = [...new Set((out.mentions ?? []).map((r) => ctx.existing.get(r)).filter((id): id is string => !!id && !handled.has(id)))];
   const title = (out.title ?? "").replace(/["\u201c\u201d]/g, "").replace(/\s+/g, " ").trim().slice(0, TITLE_MAX);
-  return { claims, contradicts, dropped, summary: (out.summary ?? "").trim().slice(0, SUMMARY_MAX), mentions, title };
+  return { claims, contradicts, dropped, summary: (out.summary ?? "").trim().slice(0, SUMMARY_MAX), mentions, title, personal: out.personal === true };
 }
 
 /** Extract claims from one chunk of text. Retries the model call once, then gives up and reports it. */
@@ -328,6 +331,7 @@ export async function extractClaims(model: JsonModel, input: ExtractInput, model
     summary: "",
     mentions: [],
     title: "",
+    personal: false,
     extracted_by,
   };
 }

@@ -128,7 +128,10 @@ export const ResolveReviewOutput = z.object({ transitions: z.array(Transition) }
 // ingest (POST /ingest, not an MCP tool): text in, claims out via extraction
 // (Brain Part A), then record_claims. Every write-back path ends here.
 export const IngestInput = z.object({
-  project_id: z.string().optional(), // required unless index_only (Oct 28)
+  project_id: z.string().optional(), // or workspace; required for full mode unless workspace is given
+  // The folder the session ran in (a repo path), or "chats". Without project_id,
+  // the session goes to the user's project for it, created on first use (Oct 29).
+  workspace: z.string().min(1).max(500).optional(),
   source: z.object({
     kind: SourceKind,
     external_id: z.string(),

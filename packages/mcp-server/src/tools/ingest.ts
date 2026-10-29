@@ -19,7 +19,9 @@ import {
   type IngestInput,
   type IngestOutput,
   type JsonModel,
+  type Project,
 } from "@plumb/core";
+import { basename } from "node:path";
 import { createHandlers, ToolError } from "./handlers.js";
 import type { Store } from "./store.js";
 
@@ -34,9 +36,8 @@ export async function ingest(
   input: z.infer<typeof IngestInput>,
 ): Promise<z.infer<typeof IngestOutput>> {
   if (input.index_only) return indexOnly(store, model, input);
-  if (!input.project_id) throw new ToolError("bad_input", "project_id is required unless index_only is set");
-  const project = await store.getProject(input.project_id);
-  if (!project) throw new ToolError("not_found", `unknown project ${input.project_id}`);
+  const project = await resolveProject(store, input);
+  if (!project) throw new ToolError("bad_input", "give project_id or workspace (or set index_only)");
 
   const now = new Date().toISOString();
   const after = new Date(Date.now() - THREAD_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -73,7 +74,10 @@ export async function ingest(
   // The tool's own title wins (e.g. a Cursor conversation title); otherwise the one extraction wrote.
   const nativeTitle = input.source.title?.trim();
   const title = nativeTitle && !isGenericTitle(nativeTitle) ? nativeTitle : result.title || nativeTitle;
-  const source = { ...input.source, ...(title && { title }) };
+  const label = input.source.label ?? (result.personal ? "personal" : undefined);
+  // Docs are shared across projects (see contexts.ts), so they never take one.
+  const project_id = input.source.kind === "doc" ? undefined : project.id;
+  const source = { ...input.source, ...(title && { title }), ...(label && { label }), ...(project_id && { project_id }) };
 
   const handlers = createHandlers(store, { model });
   const text = input.text.trim();
@@ -128,12 +132,41 @@ export async function ingest(
   };
 }
 
+// Workspaces (Oct 29): users never pick projects. A session names the folder it
+// ran in (or "chats"), and lands in the user's project for that folder, made on
+// first use. An explicit project_id still wins.
+export const CHATS_WORKSPACE = "chats";
+
+export async function workspaceProject(store: Store, workspace: string): Promise<Project> {
+  const ws = workspace.trim().replace(/[\\/]+$/, "") || CHATS_WORKSPACE;
+  const find = async () => (await store.listProjects()).find((p) => p.workspace === ws);
+  const found = await find();
+  if (found) return found;
+  const name = ws === CHATS_WORKSPACE ? "Chats" : basename(ws) || ws;
+  try {
+    return await store.createProject(name, "", ws);
+  } catch (err) {
+    const raced = await find(); // two saves from the same new folder at once
+    if (raced) return raced;
+    throw err;
+  }
+}
+
+async function resolveProject(store: Store, input: z.infer<typeof IngestInput>): Promise<Project | undefined> {
+  if (input.project_id) {
+    const project = await store.getProject(input.project_id);
+    if (!project) throw new ToolError("not_found", `unknown project ${input.project_id}`);
+    return project;
+  }
+  return input.workspace ? workspaceProject(store, input.workspace) : undefined;
+}
+
 // Index mode: one low-effort call for a title, a summary and whether it's
 // personal, then the summary is recorded as an event so search can find the
 // session. No claims and no Part C model check, which keeps it cheap enough to
 // run on every session from every tool. Part B still runs (plain code).
 async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof IngestInput>): Promise<z.infer<typeof IngestOutput>> {
-  if (input.project_id && !(await store.getProject(input.project_id))) throw new ToolError("not_found", `unknown project ${input.project_id}`);
+  const project = await resolveProject(store, input);
   const now = new Date().toISOString();
   const started = Date.now();
   let indexed;
@@ -149,7 +182,7 @@ async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof I
   const title = nativeTitle && !isGenericTitle(nativeTitle) ? nativeTitle : indexed.title || nativeTitle;
   const label = input.source.label ?? (indexed.personal ? "personal" : undefined);
   // Docs are shared across projects (see contexts.ts), so they never take one.
-  const project_id = input.source.kind === "doc" ? undefined : input.project_id;
+  const project_id = input.source.kind === "doc" ? undefined : project?.id;
   const source = { ...input.source, ...(title && { title }), ...(label && { label }), ...(project_id && { project_id }) };
 
   const recorded = await createHandlers(store, {}).record_event({

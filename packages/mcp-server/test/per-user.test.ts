@@ -92,3 +92,30 @@ describe("device sign-in (npx plumb init)", () => {
     });
   });
 });
+
+describe("workspaces: users never pick projects", () => {
+  const extractor = (personal: boolean): JsonModel => ({
+    async json(opts) {
+      if (opts.schemaName === "verdict") return opts.parse.parse({ verdict: "no", quote: null, why: "" }) as never;
+      return opts.parse.parse({ claims: [{ ref: "n1", text: "Login ships Friday", kind: "status", valid_from: null, confidence: 1, same_as: null, reasons: [{ type: "until", event_kind: null, from: null, thread_id: null, text_hint: null, since: null, at: "2027-01-01T00:00:00Z", claim_ref: null }] }], contradicts: [], summary: "Login work.", mentions: [], title: "Login work", personal }) as never;
+    },
+  });
+
+  it("a session lands in the project for its folder, made on first use, per user", async () => {
+    const store = new MemoryStore();
+    const a = new ScopedStore(store, "user-a");
+    const b = new ScopedStore(store, "user-b");
+    await ingest(a, extractor(false), { workspace: "/Users/a/code/shop/", source: { kind: "claude_code", external_id: "s1" }, text: "x" });
+    await ingest(a, extractor(false), { workspace: "/Users/a/code/shop", source: { kind: "cursor", external_id: "c1" }, text: "y" });
+    await ingest(b, extractor(true), { workspace: "/Users/a/code/shop", source: { kind: "claude_code", external_id: "s9" }, text: "z" });
+    expect(store.projects.map((p) => [p.user_id, p.name, p.workspace])).toEqual([
+      ["user-a", "shop", "/Users/a/code/shop"],
+      ["user-b", "shop", "/Users/a/code/shop"],
+    ]);
+    const aProject = store.projects[0]!.id;
+    expect([...store.claims.values()].filter((c) => c.project_id === aProject)).toHaveLength(2);
+    expect(store.sources.find((s) => s.external_id === "s1")).toMatchObject({ project_id: aProject });
+    expect(store.sources.find((s) => s.external_id === "s9")!.label).toBe("personal"); // extraction decides personal too
+    await expect(ingest(a, extractor(false), { source: { kind: "cursor", external_id: "c2" }, text: "y" })).rejects.toMatchObject({ code: "bad_input" });
+  });
+});

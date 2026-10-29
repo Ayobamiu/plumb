@@ -92,8 +92,8 @@ export class SupabaseStore implements Store, AuthStore {
     return row && toProject(row);
   }
 
-  async createProject(name: string, user_id: string): Promise<Project> {
-    const [row] = check(await this.db.from("projects").insert({ name, user_id }).select("*"));
+  async createProject(name: string, user_id: string, workspace?: string): Promise<Project> {
+    const [row] = check(await this.db.from("projects").insert({ name, user_id, ...(workspace && { workspace }) }).select("*"));
     return toProject(row!);
   }
 

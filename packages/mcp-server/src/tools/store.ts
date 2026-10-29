@@ -50,7 +50,7 @@ export interface Store {
   listProjects(): Promise<ProjectWithCounts[]>;
   getProject(id: string): Promise<Project | undefined>;
   /** A new project for a user (Oct 28: each new user gets one at sign-in). */
-  createProject(name: string, user_id: string): Promise<Project>;
+  createProject(name: string, user_id: string, workspace?: string): Promise<Project>;
   upsertSource(source: Omit<Source, "id">): Promise<Source>;
   getSource(id: string): Promise<Source | undefined>;
   loadSources(ids: string[]): Promise<Source[]>;

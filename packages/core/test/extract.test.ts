@@ -101,7 +101,7 @@ describe("extractClaims", () => {
     expect(calls).toBe(2);
     expect(out.claims).toEqual([]);
     expect(out.dropped[0]!.why).toMatch(/failed twice: schema mismatch/);
-    expect(out.extracted_by).toBe("muse-spark-1.3/extract.v7");
+    expect(out.extracted_by).toBe("muse-spark-1.3/extract.v8");
   });
 
   it("sends the prompt file and lists current claims and threads by ref", async () => {

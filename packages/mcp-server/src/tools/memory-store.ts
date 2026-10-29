@@ -33,14 +33,15 @@ export class MemoryStore implements Store, AuthStore {
   tokens: (ApiToken & { token_hash: string; last_used_at?: string })[] = [];
   devices: (DeviceLogin & { device_code_hash: string })[] = [];
 
-  addProject(name: string, user_id = MEMORY_USER): Project {
-    const project = { id: randomUUID(), name, created_at: new Date().toISOString(), user_id };
+  addProject(name: string, user_id = MEMORY_USER, workspace?: string): Project {
+    if (workspace && this.projects.some((p) => p.user_id === user_id && p.workspace === workspace)) throw new Error("duplicate key: projects_user_workspace_key");
+    const project = { id: randomUUID(), name, created_at: new Date().toISOString(), user_id, ...(workspace && { workspace }) };
     this.projects.push(project);
     return copy(project);
   }
 
-  async createProject(name: string, user_id: string) {
-    return this.addProject(name, user_id);
+  async createProject(name: string, user_id: string, workspace?: string) {
+    return this.addProject(name, user_id || MEMORY_USER, workspace);
   }
 
   async findToken(token_hash: string) {

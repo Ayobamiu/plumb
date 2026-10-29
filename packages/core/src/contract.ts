@@ -21,6 +21,9 @@ export const Project = z.object({
   name: z.string(),
   created_at: Timestamp,
   user_id: z.string().optional(), // the Supabase Auth user it belongs to (added Oct 28, Usman OK'd)
+  // The folder (or "chats") a project stands for. Users never pick projects:
+  // sessions land in the project for their folder (added Oct 29, Usman OK'd).
+  workspace: z.string().optional(),
 });
 export type Project = z.infer<typeof Project>;
 

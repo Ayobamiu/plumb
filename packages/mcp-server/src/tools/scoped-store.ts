@@ -47,9 +47,9 @@ export class ScopedStore implements Store {
     return p?.user_id === this.userId ? p : undefined;
   }
 
-  async createProject(name: string): Promise<Project> {
+  async createProject(name: string, _userId?: string, workspace?: string): Promise<Project> {
     this.projectIds = undefined;
-    return this.inner.createProject(name, this.userId);
+    return this.inner.createProject(name, this.userId, workspace);
   }
 
   // A caller-sent user_id never wins.
