@@ -25,7 +25,7 @@ You own the parts that need the most careful thinking:
 - Evals (tab 5): scenarios, runner, baselines, metrics.
 - Supabase schema and migrations.
 
-Cursor owns the UI, watchers, per-tool integrations, auth and deployment. Don't edit its folders.
+Cursor owns the UI, watchers, per-tool integrations, auth and deployment. Muse Code owns the local history sync and its own write-back. Don't edit their folders.
 
 ## Repo layout (ownership)
 
@@ -40,6 +40,9 @@ Cursor owns the UI, watchers, per-tool integrations, auth and deployment. Don't 
 | apps/web (homepage) | Cursor |
 | packages/watchers (Gmail, doc, clock) | Cursor |
 | integrations/ (Claude Code hooks, Cursor hooks and rules) | Cursor |
+| packages/local-sync, integrations/muse-code, .agents/skills/plumb | Muse Code (added Oct 28; its handoff is AGENTS.md) |
+
+Three agents share the work so no one runs out of usage (Usman, Oct 28). Muse Code reads AGENTS.md, Cursor reads .cursor/rules/plumb.mdc, you read this file.
 
 Stack: TypeScript, pnpm workspaces, Supabase (Postgres).
 
