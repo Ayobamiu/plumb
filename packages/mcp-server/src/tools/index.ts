@@ -83,6 +83,7 @@ export { findContext, listContexts, readContext } from "./contexts.js";
 export { knownThreads } from "@plumb/core"; // moved to core; kept here for existing imports
 export { sweep, type SweepResult } from "./sweep.js";
 export { listLinkSuggestions, resolveLinkSuggestion } from "./links.js";
-export { ConflictError, type Store, type BrainWrite, type ProjectWithCounts } from "./store.js";
+export { ConflictError, type Store, type AuthStore, type ApiToken, type DeviceLogin, type BrainWrite, type ProjectWithCounts } from "./store.js";
+export { ScopedStore } from "./scoped-store.js";
 export { SupabaseStore } from "./supabase-store.js";
-export { MemoryStore } from "./memory-store.js";
+export { MemoryStore, MEMORY_USER } from "./memory-store.js";

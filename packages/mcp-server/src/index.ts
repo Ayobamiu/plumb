@@ -16,4 +16,7 @@ app.listen(port, host, (err?: Error) => {
   console.log("  POST /mcp          (Streamable HTTP, bearer)");
   console.log("  POST /tools/:name  (REST, bearer)");
   console.log("  POST /ingest       (extraction, bearer)");
+  console.log("  POST /links        (list suggestions, bearer)");
+  console.log("  POST /links/resolve (accept/dismiss, bearer)");
+  console.log("  POST /sweep        (sleep-time sweep, bearer)");
 });

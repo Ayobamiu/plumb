@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import { createHttpApp } from "../src/http.js";
-import { MemoryStore } from "../src/tools/memory-store.js";
+import { MEMORY_USER, MemoryStore } from "../src/tools/memory-store.js";
 
 async function withServer(
   run: (base: string) => Promise<void>,
@@ -10,7 +10,7 @@ async function withServer(
   const store = new MemoryStore();
   store.addProject("Http test");
   const tokens = new Map([["test-token", "web" as const]]);
-  const app = createHttpApp({ store, tokens, host: "127.0.0.1" });
+  const app = createHttpApp({ store, tokens, ownerUserId: MEMORY_USER, host: "127.0.0.1" });
   const server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
@@ -57,6 +57,30 @@ describe("http transport", () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as { projects: { name: string }[] };
       expect(body.projects.some((p) => p.name === "Http test")).toBe(true);
+    });
+  });
+
+  it("lists link suggestions through POST /links", async () => {
+    await withServer(async (base) => {
+      const projects = await fetch(`${base}/tools/list_projects`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-token",
+        },
+        body: "{}",
+      }).then((r) => r.json() as Promise<{ projects: { id: string }[] }>);
+      const projectId = projects.projects[0]!.id;
+      const res = await fetch(`${base}/links`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-token",
+        },
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ suggestions: [] });
     });
   });
 

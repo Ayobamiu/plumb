@@ -20,6 +20,7 @@ export const Project = z.object({
   id: z.string(),
   name: z.string(),
   created_at: Timestamp,
+  user_id: z.string().optional(), // the Supabase Auth user it belongs to (added Oct 28, Usman OK'd)
 });
 export type Project = z.infer<typeof Project>;
 
@@ -34,6 +35,7 @@ export const Source = z.object({
   // session indexed without claims still shows in that project's @ list.
   label: z.enum(["personal"]).optional(),
   project_id: z.string().optional(),
+  user_id: z.string().optional(), // the Supabase Auth user it belongs to (added Oct 28, Usman OK'd)
 });
 export type Source = z.infer<typeof Source>;
 

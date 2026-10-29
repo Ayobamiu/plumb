@@ -49,6 +49,8 @@ export interface TransitionFilter {
 export interface Store {
   listProjects(): Promise<ProjectWithCounts[]>;
   getProject(id: string): Promise<Project | undefined>;
+  /** A new project for a user (Oct 28: each new user gets one at sign-in). */
+  createProject(name: string, user_id: string): Promise<Project>;
   upsertSource(source: Omit<Source, "id">): Promise<Source>;
   getSource(id: string): Promise<Source | undefined>;
   loadSources(ids: string[]): Promise<Source[]>;
@@ -75,3 +77,33 @@ export interface Store {
 
 /** Another run changed a claim between our read and our write. Safe to retry. */
 export class ConflictError extends Error {}
+
+// Per user (Oct 28). Tokens and device sign-ins. Only hashes of secrets are stored.
+export interface ApiToken {
+  id: string;
+  user_id: string;
+  tool: string;
+  revoked_at?: string;
+}
+
+export interface DeviceLogin {
+  id: string;
+  user_code: string;
+  tool: string;
+  user_id?: string;
+  expires_at: string;
+  approved_at?: string;
+  token_issued_at?: string;
+}
+
+export interface AuthStore {
+  findToken(token_hash: string): Promise<ApiToken | undefined>;
+  createToken(row: { user_id: string; tool: string; token_hash: string }): Promise<ApiToken>;
+  touchToken(id: string, at: string): Promise<void>;
+  createDeviceLogin(row: { device_code_hash: string; user_code: string; tool: string; expires_at: string }): Promise<DeviceLogin>;
+  findDeviceLogin(by: { device_code_hash: string } | { user_code: string }): Promise<DeviceLogin | undefined>;
+  /** Sets user_id and approved_at if still unapproved. False otherwise. */
+  approveDeviceLogin(id: string, user_id: string, at: string): Promise<boolean>;
+  /** Sets token_issued_at if not set yet. False if a token was already issued. */
+  markDeviceTokenIssued(id: string, at: string): Promise<boolean>;
+}

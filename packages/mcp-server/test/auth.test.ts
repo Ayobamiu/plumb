@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { loadTokens, parseBearer, requireBearer } from "../src/auth.js";
+import { hashToken, loadTokens, parseBearer, requireBearer } from "../src/auth.js";
+import { MemoryStore } from "../src/tools/memory-store.js";
 import type { Request, Response } from "express";
 
 function mockRes() {
@@ -54,39 +55,38 @@ describe("auth", () => {
     expect(parseBearer(undefined)).toBeUndefined();
   });
 
-  it("requireBearer accepts a known token and rejects others", () => {
-    const tokens = loadTokens({ PLUMB_TOKEN_WEB: "web-secret" });
-    const mw = requireBearer(tokens);
+  it("requireBearer: env tokens act as the owner, personal tokens as their user, revoked or unknown ones are refused", async () => {
+    const auth = new MemoryStore();
+    const personal = await auth.createToken({ user_id: "user-b", tool: "cli", token_hash: hashToken("plumb_personal") });
+    await auth.createToken({ user_id: "user-c", tool: "cli", token_hash: hashToken("plumb_revoked") });
+    auth.tokens.at(-1)!.revoked_at = "2026-10-28T00:00:00Z";
+    const mw = requireBearer({ tokens: loadTokens({ PLUMB_TOKEN_WEB: "web-secret" }), ownerUserId: "owner", auth });
+    const run = async (header?: string) => {
+      const req = { header: () => header } as unknown as Request;
+      const r = mockRes();
+      let passed = false;
+      await mw(req, r.res, () => {
+        passed = true;
+      });
+      return { req, status: r.status, passed };
+    };
 
-    const okReq = { header: () => "Bearer web-secret" } as unknown as Request;
-    let nextCalled = false;
-    const ok = mockRes();
-    mw(okReq, ok.res, () => {
-      nextCalled = true;
-    });
-    expect(nextCalled).toBe(true);
-    expect(okReq.plumbTool).toBe("web");
+    const env = await run("Bearer web-secret");
+    expect(env).toMatchObject({ passed: true });
+    expect([env.req.plumbUserId, env.req.plumbTool]).toEqual(["owner", "web"]);
 
-    const bad = mockRes();
-    mw({ header: () => "Bearer nope" } as unknown as Request, bad.res, () => {
+    const mine = await run("Bearer plumb_personal");
+    expect([mine.passed, mine.req.plumbUserId, mine.req.plumbTool]).toEqual([true, "user-b", "cli"]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(auth.tokens.find((t) => t.id === personal.id)!.last_used_at).toBeDefined();
+
+    for (const h of ["Bearer plumb_revoked", "Bearer nope", undefined]) expect(await run(h)).toMatchObject({ passed: false, status: 401 });
+
+    const noOwner = requireBearer({ tokens: loadTokens({ PLUMB_TOKEN_WEB: "web-secret" }) });
+    const r = mockRes();
+    await noOwner({ header: () => "Bearer web-secret" } as unknown as Request, r.res, () => {
       throw new Error("should not next");
     });
-    expect(bad.status).toBe(401);
-
-    const missing = mockRes();
-    mw({ header: () => undefined } as unknown as Request, missing.res, () => {
-      throw new Error("should not next");
-    });
-    expect(missing.status).toBe(401);
-
-    const empty = mockRes();
-    requireBearer(new Map())(
-      { header: () => "Bearer x" } as unknown as Request,
-      empty.res,
-      () => {
-        throw new Error("should not next");
-      },
-    );
-    expect(empty.status).toBe(503);
+    expect(r.status).toBe(503);
   });
 });

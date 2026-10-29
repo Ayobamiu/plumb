@@ -9,14 +9,19 @@ import {
   type EventFilter,
   type NewLinkSuggestion,
   type ProjectWithCounts,
+  type ApiToken,
+  type AuthStore,
+  type DeviceLogin,
   type ReasonFilter,
   type Store,
   type TransitionFilter,
 } from "./store.js";
 
 const copy = <T>(x: T): T => structuredClone(x);
+/** The user rows belong to when a test uses MemoryStore directly. */
+export const MEMORY_USER = "00000000-0000-4000-8000-000000000001";
 
-export class MemoryStore implements Store {
+export class MemoryStore implements Store, AuthStore {
   projects: Project[] = [];
   sources: Source[] = [];
   claims = new Map<string, Claim>();
@@ -25,11 +30,61 @@ export class MemoryStore implements Store {
   transitions: Transition[] = [];
   cursors = new Map<string, string>();
   links: LinkSuggestionRow[] = [];
+  tokens: (ApiToken & { token_hash: string; last_used_at?: string })[] = [];
+  devices: (DeviceLogin & { device_code_hash: string })[] = [];
 
-  addProject(name: string): Project {
-    const project = { id: randomUUID(), name, created_at: new Date().toISOString() };
+  addProject(name: string, user_id = MEMORY_USER): Project {
+    const project = { id: randomUUID(), name, created_at: new Date().toISOString(), user_id };
     this.projects.push(project);
     return copy(project);
+  }
+
+  async createProject(name: string, user_id: string) {
+    return this.addProject(name, user_id);
+  }
+
+  async findToken(token_hash: string) {
+    const t = this.tokens.find((x) => x.token_hash === token_hash);
+    return t && { id: t.id, user_id: t.user_id, tool: t.tool, ...(t.revoked_at && { revoked_at: t.revoked_at }) };
+  }
+
+  async createToken(row: { user_id: string; tool: string; token_hash: string }) {
+    const t = { id: randomUUID(), ...row };
+    this.tokens.push(t);
+    return { id: t.id, user_id: t.user_id, tool: t.tool };
+  }
+
+  async touchToken(id: string, at: string) {
+    const t = this.tokens.find((x) => x.id === id);
+    if (t) t.last_used_at = at;
+  }
+
+  async createDeviceLogin(row: { device_code_hash: string; user_code: string; tool: string; expires_at: string }) {
+    const d = { id: randomUUID(), ...row };
+    this.devices.push(d);
+    const { device_code_hash: _, ...out } = d;
+    return copy(out);
+  }
+
+  async findDeviceLogin(by: { device_code_hash: string } | { user_code: string }) {
+    const d = this.devices.find((x) => ("user_code" in by ? x.user_code === by.user_code : x.device_code_hash === by.device_code_hash));
+    if (!d) return undefined;
+    const { device_code_hash: _, ...out } = d;
+    return copy(out);
+  }
+
+  async approveDeviceLogin(id: string, user_id: string, at: string) {
+    const d = this.devices.find((x) => x.id === id);
+    if (!d || d.approved_at) return false;
+    Object.assign(d, { user_id, approved_at: at });
+    return true;
+  }
+
+  async markDeviceTokenIssued(id: string, at: string) {
+    const d = this.devices.find((x) => x.id === id);
+    if (!d || d.token_issued_at) return false;
+    d.token_issued_at = at;
+    return true;
   }
 
   async listProjects(): Promise<ProjectWithCounts[]> {
@@ -45,12 +100,13 @@ export class MemoryStore implements Store {
   }
 
   async upsertSource(source: Omit<Source, "id">): Promise<Source> {
-    const found = this.sources.find((s) => s.kind === source.kind && s.external_id === source.external_id);
+    const user_id = source.user_id ?? MEMORY_USER; // tests that skip ScopedStore act as one user
+    const found = this.sources.find((s) => s.user_id === user_id && s.kind === source.kind && s.external_id === source.external_id);
     if (found) {
       Object.assign(found, source);
       return copy(found);
     }
-    const created = { id: randomUUID(), ...source };
+    const created = { id: randomUUID(), ...source, user_id };
     this.sources.push(created);
     return copy(created);
   }

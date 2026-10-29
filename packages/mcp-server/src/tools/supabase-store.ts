@@ -10,6 +10,9 @@ import {
   type EventFilter,
   type NewLinkSuggestion,
   type ProjectWithCounts,
+  type ApiToken,
+  type AuthStore,
+  type DeviceLogin,
   type ReasonFilter,
   type Store,
   type TransitionFilter,
@@ -20,6 +23,7 @@ type Result = { data: unknown; error: { message: string; code?: string } | null 
 
 const PAGE = 1000; // PostgREST's default row cap
 const CHUNK = 100; // ids per in() filter, to keep URLs short
+const DEVICE_COLUMNS = "id, user_code, tool, user_id, expires_at, approved_at, token_issued_at";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Postgres nulls become missing fields, matching the optional fields in the Contract.
@@ -61,7 +65,7 @@ async function byIds(ids: string[], run: (chunk: string[]) => Promise<Row[]>): P
   return rows;
 }
 
-export class SupabaseStore implements Store {
+export class SupabaseStore implements Store, AuthStore {
   constructor(private db: SupabaseClient) {}
 
   /** Service role client from SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. Server side only. */
@@ -88,9 +92,16 @@ export class SupabaseStore implements Store {
     return row && toProject(row);
   }
 
+  async createProject(name: string, user_id: string): Promise<Project> {
+    const [row] = check(await this.db.from("projects").insert({ name, user_id }).select("*"));
+    return toProject(row!);
+  }
+
+  // Per user (Oct 28): a source is unique per user, kind and external id.
   async upsertSource(source: Omit<Source, "id">): Promise<Source> {
+    if (!source.user_id) throw new Error("upsertSource needs user_id (use a ScopedStore)");
     const rows = check(
-      await this.db.from("sources").upsert(source, { onConflict: "kind,external_id" }).select("*"),
+      await this.db.from("sources").upsert(source, { onConflict: "user_id,kind,external_id" }).select("*"),
     );
     return toSource(rows[0]!);
   }
@@ -229,6 +240,47 @@ export class SupabaseStore implements Store {
     const transitions = rows.map(toTransition);
     // Chunks come back one after another; restore the overall order.
     return transitions.sort((x, y) => Date.parse(x.at) - Date.parse(y.at) || x.id.localeCompare(y.id));
+  }
+
+  /** The Supabase Auth user behind a session access token (the homepage's sign-in), or undefined. */
+  async verifySession(accessToken: string): Promise<string | undefined> {
+    const { data, error } = await this.db.auth.getUser(accessToken);
+    return error ? undefined : data.user?.id;
+  }
+
+  async findToken(token_hash: string): Promise<ApiToken | undefined> {
+    const [row] = check(await this.db.from("api_tokens").select("id, user_id, tool, revoked_at").eq("token_hash", token_hash));
+    return row && (clean(row) as unknown as ApiToken);
+  }
+
+  async createToken(row: { user_id: string; tool: string; token_hash: string }): Promise<ApiToken> {
+    const [created] = check(await this.db.from("api_tokens").insert(row).select("id, user_id, tool, revoked_at"));
+    return clean(created!) as unknown as ApiToken;
+  }
+
+  async touchToken(id: string, at: string) {
+    check(await this.db.from("api_tokens").update({ last_used_at: at }).eq("id", id).select("id"));
+  }
+
+  async createDeviceLogin(row: { device_code_hash: string; user_code: string; tool: string; expires_at: string }): Promise<DeviceLogin> {
+    const [created] = check(await this.db.from("device_logins").insert(row).select(DEVICE_COLUMNS));
+    return clean(created!) as unknown as DeviceLogin;
+  }
+
+  async findDeviceLogin(by: { device_code_hash: string } | { user_code: string }): Promise<DeviceLogin | undefined> {
+    const [col, value] = "user_code" in by ? ["user_code", by.user_code] : ["device_code_hash", by.device_code_hash];
+    const [row] = check(await this.db.from("device_logins").select(DEVICE_COLUMNS).eq(col, value));
+    return row && (clean(row) as unknown as DeviceLogin);
+  }
+
+  async approveDeviceLogin(id: string, user_id: string, at: string) {
+    const rows = check(await this.db.from("device_logins").update({ user_id, approved_at: at }).eq("id", id).is("approved_at", null).select("id"));
+    return rows.length === 1;
+  }
+
+  async markDeviceTokenIssued(id: string, at: string) {
+    const rows = check(await this.db.from("device_logins").update({ token_issued_at: at }).eq("id", id).is("token_issued_at", null).select("id"));
+    return rows.length === 1;
   }
 
   async apply(write: BrainWrite) {

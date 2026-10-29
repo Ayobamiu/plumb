@@ -4,13 +4,15 @@
 // Run: pnpm smoke:db
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
-import { callTool, SupabaseStore } from "./index.js";
+import { callTool, ScopedStore, SupabaseStore } from "./index.js";
 
 const db = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
-const store = SupabaseStore.fromEnv();
-const call = (name: string, input: unknown) => callTool(store, name, input) as Promise<any>;
+// Runs as the owner (per user, Oct 28): every request is scoped to a user.
+const store = new ScopedStore(SupabaseStore.fromEnv(), process.env.PLUMB_OWNER_USER_ID!);
+// Plain code only (Part B): the model check would make the "other thread" step depend on a model answer.
+const call = (name: string, input: unknown) => callTool(store, name, input, { model: null }) as Promise<any>;
 
 function expect(ok: boolean, what: string) {
   if (!ok) throw new Error(`smoke failed: ${what}`);
