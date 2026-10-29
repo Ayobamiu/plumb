@@ -99,6 +99,13 @@ describe("npx plumb-ai init, end to end", () => {
       expect(last).toContain("Done: the login page now uses per-tool tokens.");
       expect(last).not.toContain("Refactor auth to one token per tool");
 
+      // init again (after an update) keeps the working token: no new sign-in.
+      const devicesBefore = store.devices.length;
+      const reinit = await run(["init", "--api", api, "--yes", "--no-backfill"], env);
+      expect(reinit.out).toContain("Already signed in");
+      expect(store.devices.length).toBe(devicesBefore);
+      expect(JSON.parse(readFileSync(join(home, ".plumb", "config.json"), "utf8")).token).toBe(config.token);
+
       // Session start in that repo: nothing changed yet, so no note.
       const start = (dir: string) => run(["hook-start", "claude-code"], env, undefined, JSON.stringify({ cwd: dir }));
       expect((await start(cwd)).out.trim()).toBe("");

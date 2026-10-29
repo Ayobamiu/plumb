@@ -33,6 +33,7 @@ const flag = (name) => args.includes(name);
 const opt = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
 const MID_SESSION_MS = 15 * 60 * 1000; // a running session is saved at most every 15 minutes
 const PARALLEL = 3;
+const RECENT_DAYS = 30;
 
 function need() {
   const c = loadConfig();
@@ -62,8 +63,23 @@ function openUrl(url) {
 
 // ---- init ----
 
+async function signedIn(config) {
+  try {
+    await post(config.api, "/tools/list_projects", {}, config.token, 10_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function init() {
   const api = opt("--api") || process.env.PLUMB_API_URL || loadConfig()?.api || DEFAULT_API;
+  // Running init again (after an update) keeps a token that still works.
+  const existing = loadConfig();
+  if (existing?.token && existing.api === api && !flag("--relogin") && (await signedIn(existing))) {
+    console.log("\nAlready signed in (use --relogin to sign in again).\n");
+    return setUp();
+  }
   const start = await post(api, "/auth/device", { tool: "cli" });
   console.log(`\nSign in to Plumb in your browser. Your code: ${start.user_code}\n${start.verification_url}\n`);
   openUrl(start.verification_url);
@@ -84,7 +100,10 @@ async function init() {
   }
   if (!token) throw new Error("The code expired. Run plumb init again.");
   console.log("Signed in.\n");
+  return setUp();
+}
 
+async function setUp() {
   copyApp();
   const config = loadConfig();
   for (const [name, present, install] of [
@@ -184,12 +203,22 @@ async function backfill() {
   console.log("Past sessions on this computer:");
   summarize(groups);
   if (!all.length) return;
-  console.log("\nPlumb writes down what each session decided and planned, so it can tell you later what stopped being true. Personal ones are marked, secrets are stripped first, and sessions already saved are skipped.");
+  console.log(`\nFor sessions from the last ${RECENT_DAYS} days, Plumb writes down what each decided and planned, so it can tell you later what stopped being true. Older ones get a title and a summary, so you can still find them. Personal ones are marked, secrets are stripped first, and sessions already saved are skipped.`);
   if (flag("--dry-run") || !(await ask(`Bring in ${all.length} sessions now?`))) {
     console.log(`Nothing sent. Run \`npx plumb-ai backfill\` when you're ready${process.stdin.isTTY ? "" : " (add --yes to skip the question)"}.\n`);
     return;
   }
-  await send(config, all, { index: flag("--index") });
+  // Claims only matter while work is current: sessions from the last 30 days are
+  // read in full; older ones are indexed (title and summary), still findable by
+  // description. --full-all reads everything in full, --index nothing.
+  const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
+  const recent = all.filter((s) => !flag("--index") && (flag("--full-all") || Date.parse(s.modified_at ?? 0) >= cutoff));
+  const older = all.filter((s) => !recent.includes(s));
+  if (recent.length) await send(config, recent);
+  if (older.length) {
+    if (recent.length) console.log(`  Older than ${RECENT_DAYS} days, indexed only:`);
+    await send(config, older, { index: true });
+  }
   console.log();
 }
 
