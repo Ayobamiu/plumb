@@ -18,13 +18,25 @@ const good = answer(200, { id: "r1", output: [{ type: "message", content: [{ typ
 afterEach(() => vi.unstubAllGlobals());
 
 describe("MetaClient retries", () => {
-  it("retries a 404 'model not found' and succeeds", async () => {
-    const fetch = vi.fn()
-      .mockResolvedValueOnce(answer(404, { error: { message: "The requested model was not found." } }))
-      .mockResolvedValueOnce(good);
+  it("a 404 'model not found' falls back to the next standard model, never a contributor one", async () => {
+    const missing = answer(404, { error: { message: "The requested model was not found." } });
+    const fetch = vi.fn().mockResolvedValueOnce(missing).mockResolvedValueOnce(good);
     vi.stubGlobal("fetch", fetch);
     await expect(new MetaClient("k", [0, 0]).json(opts)).resolves.toEqual({ ok: true });
-    expect(fetch).toHaveBeenCalledTimes(2);
+    const models = fetch.mock.calls.map((c) => JSON.parse(c[1].body).model);
+    expect(models).toEqual(["muse-spark-1.3", "muse-spark-1.2"]);
+
+    // Both missing: it says so, without trying anything else.
+    const none = vi.fn().mockResolvedValue(missing);
+    vi.stubGlobal("fetch", none);
+    await expect(new MetaClient("k", [0, 0]).json(opts)).rejects.toThrow(/model was not found/);
+    expect(none.mock.calls.map((c) => JSON.parse(c[1].body).model)).toEqual(["muse-spark-1.3", "muse-spark-1.2"]);
+
+    // A caller that names a model gets only that model.
+    const named = vi.fn().mockResolvedValue(missing);
+    vi.stubGlobal("fetch", named);
+    await expect(new MetaClient("k", [0, 0]).json({ ...opts, model: "muse-spark-1.1" })).rejects.toThrow();
+    expect(named).toHaveBeenCalledTimes(1);
   });
 
   it("gives up after three attempts", async () => {

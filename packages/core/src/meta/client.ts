@@ -13,6 +13,10 @@ export const META_BASE_URL = "https://api.meta.ai/v1";
 // unavailable, calls fail and /ingest asks the caller to retry later.
 const configured = process.env.META_MODEL_ID?.trim();
 export const MUSE_SPARK = configured && !/contributor/i.test(configured) ? configured : "muse-spark-1.3";
+// Oct 29: the key's model list flipped again (standard 1.3 gone, only the
+// contributor 1.3 listed). When the default model answers "not found", calls
+// fall back to the next standard model instead of failing. Never contributor.
+export const MUSE_SPARK_FALLBACKS = ["muse-spark-1.2"].filter((m) => m !== MUSE_SPARK);
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -58,6 +62,8 @@ export interface JsonCallOptions<T> {
 const TRANSIENT_STATUS = new Set([404, 408, 429, 500, 502, 503, 504]);
 
 class TransientError extends Error {}
+/** 404 "model not found": this key can't reach that model right now. */
+class ModelMissingError extends TransientError {}
 
 export class MetaClient {
   constructor(
@@ -68,12 +74,24 @@ export class MetaClient {
   }
 
   async json<T>(opts: JsonCallOptions<T>): Promise<T> {
+    // Only the default model falls back; a caller that names another model gets that one.
+    const chain = (opts.model ?? MUSE_SPARK) === MUSE_SPARK ? [MUSE_SPARK, ...MUSE_SPARK_FALLBACKS] : [opts.model!];
+    for (let i = 0; ; i++) {
+      try {
+        return await this.withRetries({ ...opts, model: chain[i] });
+      } catch (err) {
+        if (!(err instanceof ModelMissingError) || i === chain.length - 1) throw err;
+      }
+    }
+  }
+
+  private async withRetries<T>(opts: JsonCallOptions<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.attempt(opts);
       } catch (err) {
         const wait = this.retryDelaysMs[attempt];
-        if (!(err instanceof TransientError) || wait === undefined) throw err;
+        if (!(err instanceof TransientError) || err instanceof ModelMissingError || wait === undefined) throw err;
         await new Promise((resolve) => setTimeout(resolve, wait));
       }
     }
@@ -120,6 +138,7 @@ export class MetaClient {
       const body = (await res.json().catch(() => ({}))) as ResponsesBody;
       if (!res.ok || body.error) {
         const message = `Meta API ${res.status}: ${body.error?.message ?? "unknown error"}`;
+        if (res.status === 404 && /model/i.test(message)) throw new ModelMissingError(message);
         throw TRANSIENT_STATUS.has(res.status) ? new TransientError(message) : new Error(message);
       }
       log.response_id = body.id;
