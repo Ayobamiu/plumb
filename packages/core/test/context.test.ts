@@ -52,7 +52,7 @@ describe("renderContext", () => {
     expect(md).toContain("## What happened\n\n- Oct 27, 2:00 PM EDT: Usman finished the middleware.");
     expect(md).toContain("## Still true\n\n- [decision] We use JWT for sessions");
     expect(md).toContain("## No longer true\n\n- [status] All tests pass on main. Went OUT because CI failed.");
-    expect(md).toContain("## Waiting for your review\n\n- [next step] Login page ships Friday.");
+    expect(md).toContain("## May be out of date\n\n- [next step] Login page ships Friday.");
     expect(md).toContain("## Changed since, elsewhere\n\n- OUT: Staging uses Postgres 16. Went OUT because the doc was edited.");
     expect(md).not.toMatch(/—/);
   });

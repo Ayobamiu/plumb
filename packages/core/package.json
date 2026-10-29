@@ -15,6 +15,6 @@
     "smoke:meta": "tsx --env-file=../../.env src/meta/smoke.ts"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^3.25.76"
   }
 }

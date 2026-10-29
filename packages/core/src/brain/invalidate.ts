@@ -8,6 +8,7 @@ import {
   explainAbsenceBroken,
   explainChain,
   explainConfirmedOut,
+  explainFaded,
   explainRestored,
   explainUntilPassed,
 } from "./explain.js";
@@ -154,6 +155,31 @@ export function restore(state: BrainState, claimId: string, ctx: BrainContext): 
   }
   return changes;
 }
+
+/**
+ * REVIEW fades (Oct 29, Usman OK'd). REVIEW means "may be out of date", shown as
+ * a label, never a question. If nothing confirms it within `days` (no reason
+ * breaks, nobody marks it OUT), code moves it back to IN. REVIEW never knocked
+ * down dependents, so only the claim itself changes. Needs state.transitions
+ * holding the REVIEW transitions.
+ */
+export const REVIEW_FADE_DAYS = 7;
+
+export function fadeReviews(state: BrainState, ctx: BrainContext, days = REVIEW_FADE_DAYS): Change[] {
+  const flaggedAt = new Map<string, string>();
+  for (const t of state.transitions) if (t.to_status === "REVIEW") flaggedAt.set(t.claim_id, later(flaggedAt.get(t.claim_id), t.at));
+  const cutoff = Date.parse(ctx.now) - days * 24 * 60 * 60 * 1000;
+  const changes: Change[] = [];
+  for (const claim of state.claims.values()) {
+    if (claim.status !== "REVIEW") continue;
+    const at = flaggedAt.get(claim.id);
+    if (!at || Date.parse(at) > cutoff) continue;
+    changes.push(setStatus(state, claim, "IN", ctx, { depth: 0, explanation: explainFaded(days) }));
+  }
+  return changes;
+}
+
+const later = (a: string | undefined, b: string) => (!a || Date.parse(b) > Date.parse(a) ? b : a);
 
 /** Part C entry point: a model check may send a claim to REVIEW, never to OUT. */
 export function sendToReview(

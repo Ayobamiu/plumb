@@ -95,6 +95,11 @@ export function explainContradicted(sourceTitle: string, quote: string): string 
   return `Sent to REVIEW because ${sourceTitle} said: "${quote.replace(/[.!?]+$/, "")}".`;
 }
 
+/** REVIEW fades (Oct 29, Usman OK'd): nothing confirmed the change, so the flag goes away. */
+export function explainFaded(days: number): string {
+  return `Back IN: nothing confirmed the change within ${days} days.`;
+}
+
 export function explainConfirmedOut(): string {
   return "Went OUT because you confirmed it is no longer true.";
 }

@@ -178,8 +178,29 @@ export async function readContext(store: Store, input: z.infer<typeof GetContext
   return {
     uri: contextUri(source),
     name: contextName(source, lastAt),
-    markdown: renderContext({ source, lastAt, events, claims, latestTransition, changedSince }),
+    markdown: renderContext({ source, lastAt, events, claims, latestTransition, changedSince, related: await relatedFor(store, ownIds) }),
   };
+}
+
+const MAX_RELATED = 5;
+
+/** Claims elsewhere that the sweep linked to these (Oct 29: links are context, never asked about). */
+async function relatedFor(store: Store, ownIds: string[]) {
+  if (!ownIds.length) return [];
+  const own = new Set(ownIds);
+  const links = (await store.loadLinkSuggestions())
+    .filter((l) => l.status !== "dismissed" && (own.has(l.claim_id) || own.has(l.depends_on)))
+    .slice(0, MAX_RELATED);
+  const otherIds = links.map((l) => (own.has(l.claim_id) ? l.depends_on : l.claim_id));
+  if (!otherIds.length) return [];
+  const others = await store.loadClaims({ ids: otherIds });
+  const sources = new Map((await store.loadSources([...new Set(others.map((c) => c.source_id))])).map((x) => [x.id, x]));
+  return links.flatMap((l, i) => {
+    const c = others.find((x) => x.id === otherIds[i]);
+    if (!c || c.status === "OUT") return [];
+    const src = sources.get(c.source_id);
+    return [{ text: c.text, from: src ? `${toolLabel(src.kind)}: ${src.title ?? "untitled"}` : "another session", why: l.why }];
+  });
 }
 
 // find_context. With a model (Oct 28), the query is a description in the

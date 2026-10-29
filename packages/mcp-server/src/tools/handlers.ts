@@ -11,6 +11,7 @@ import {
   EventKind,
   evaluateClaims,
   explainEdited,
+  fadeReviews,
   isQuiet,
   materializeClaims,
   modelCheck,
@@ -121,6 +122,19 @@ export interface HandlerOptions {
 }
 
 export function createHandlers(store: Store, opts: HandlerOptions = {}) {
+  /** Not an MCP tool (the sweep): REVIEWs that nothing confirmed for 7 days go back IN. */
+  async function fade(): Promise<Transition[]> {
+    return withRetry(async () => {
+      const ctx = context();
+      const state = await loadBrain(store);
+      state.transitions = await store.loadTransitions({ to_statuses: ["REVIEW"] });
+      const before = statuses(state);
+      const changes = fadeReviews(state, ctx);
+      if (changes.length) await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
+      return changes.map((c) => c.transition);
+    });
+  }
+
   /** Not an MCP tool: send claims to REVIEW (Part C and /ingest). Never OUT. */
   async function review(items: ReviewItem[]): Promise<Transition[]> {
     if (items.length === 0) return [];
@@ -172,6 +186,7 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
 
   return {
     review,
+    fade,
     mention,
     toolCoverage,
 

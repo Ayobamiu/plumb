@@ -1,8 +1,9 @@
 // Sleep-time sweep, run every few hours by a scheduler (not an MCP tool):
 //   const result = await sweep(SupabaseStore.fromEnv(), new MetaClient());
 // Re-checks hint-only claims against events seen since the last sweep, and
-// flags repeats: those go to REVIEW, never OUT. It also suggests missing
-// depends_on links, which go to link_suggestions for Usman to accept or dismiss.
+// flags repeats: those go to REVIEW, never OUT. REVIEWs nothing confirmed for 7
+// days go back IN (Oct 29). It also finds likely depends_on links; since Oct 29
+// they are never shown for approval, only listed as related context.
 import {
   EventKind,
   findDuplicates,
@@ -26,12 +27,14 @@ export interface SweepResult {
   rechecked: number; // claims the re-check asked the model about
   events: number; // events new since the last sweep
   transitions: Transition[]; // claims sent to REVIEW
+  faded: Transition[]; // REVIEWs back IN after 7 days with nothing confirming them
   links: number; // new link suggestions waiting for the user
   expired: number; // pending suggestions retired as no longer relevant
 }
 
 export async function sweep(store: Store, model: JsonModel): Promise<SweepResult> {
   const until = new Date().toISOString();
+  const faded = await createHandlers(store).fade();
   const since =
     (await store.getCursor(CURSOR)) ?? new Date(Date.now() - FIRST_RUN_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -85,5 +88,5 @@ export async function sweep(store: Store, model: JsonModel): Promise<SweepResult
 
   // Move the cursor only after the writes, so a failed sweep is retried next time.
   await store.setCursor(CURSOR, until);
-  return { since, until, rechecked: recheck.checked, events: events.length, transitions, links: links.length, expired };
+  return { since, until, rechecked: recheck.checked, events: events.length, transitions, faded, links: links.length, expired };
 }

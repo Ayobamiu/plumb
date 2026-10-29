@@ -83,6 +83,7 @@ export interface ContextInput {
   claims: Claim[]; // claims written from this source
   latestTransition: Map<string, Transition>; // claim id -> its latest transition
   changedSince: { claim: Claim; transition: Transition }[]; // related claims that changed after lastAt
+  related?: { text: string; from: string; why: string }[]; // claims elsewhere the sweep linked to this session's claims
 }
 
 const MAX_SUMMARIES = 5;
@@ -112,7 +113,7 @@ export function renderContext(input: ContextInput): string {
   const groups: [string, Claim[], boolean][] = [
     ["Still true", claims.filter((c) => c.status === "IN"), false],
     ["No longer true", claims.filter((c) => c.status === "OUT"), true],
-    ["Waiting for your review", claims.filter((c) => c.status === "REVIEW"), true],
+    ["May be out of date", claims.filter((c) => c.status === "REVIEW"), true],
   ];
   for (const [heading, list, withWhy] of groups) {
     if (!list.length) continue;
@@ -125,8 +126,12 @@ export function renderContext(input: ContextInput): string {
       "",
       "## Changed since, elsewhere",
       "",
-      ...input.changedSince.map(({ claim, transition }) => `- ${transition.to_status}: ${sentence(claim.text)} ${transition.explanation}`),
+      ...input.changedSince.map(({ claim, transition }) => `- ${transition.to_status === "REVIEW" ? "May be out of date" : transition.to_status}: ${sentence(claim.text)} ${transition.explanation}`),
     );
+  }
+  // Links the sweep found (Oct 29: never shown for approval, only as context).
+  if (input.related?.length) {
+    lines.push("", "## Related", "", ...input.related.map((r) => `- ${sentence(r.text)} (${r.from}; ${r.why.trim()})`));
   }
   return lines.join("\n") + "\n";
 }
