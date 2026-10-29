@@ -7,7 +7,7 @@ import { z } from "zod";
 import { MUSE_SPARK } from "../meta/client.js";
 import { loadPrompt, type JsonModel } from "./extract.js";
 
-export const SEARCH_PROMPT = "search.v2";
+export const SEARCH_PROMPT = "search.v3";
 const MAX_CANDIDATES = 40;
 const MAX_CLAIMS = 3;
 

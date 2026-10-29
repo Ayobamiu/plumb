@@ -48,7 +48,7 @@ export const toolDescriptions: Record<ToolName, string> = {
   explain_claim: "The reason chain and full status history for one claim.",
   resolve_review: "Usman's decision on a claim: confirm_out, restore_in, or edit its text.",
   find_context:
-    "Find a session, chat, doc or email thread from the user's other tools (Claude Code, Cursor, Claude chat, docs, Gmail) from a description in their own words, e.g. 'gym plan from Claude last week'. Pass their words as typed, not keywords. Returns the best match first, then up to 3 alternatives; empty if nothing fits. Then call get_context with the uri.",
+    "Find a session, chat, doc or email thread from the user's other tools (Claude Code, Cursor, Claude chat, docs, Gmail) from a description in their own words, e.g. 'gym plan from Claude last week'. Pass their words as typed, not keywords. Returns the best match first, then up to 3 alternatives, each with a why. If nothing fits, only near misses come back and each why starts 'Not a clear match'; tell the user it wasn't found and offer them. Then call get_context with the uri.",
   get_context:
     "Get what a session from another tool said, and what of it is still true now: what happened, what it decided and planned (still true / no longer true and why / waiting for review), and what changed since. Pass the uri from find_context or an @ mention.",
 };

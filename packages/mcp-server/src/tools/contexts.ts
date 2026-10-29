@@ -32,6 +32,7 @@ const SEARCH_DAYS = 90; // search by description looks further back than the @ l
 const RESOLVE_DAYS = 90; // an @ link stays readable a while after it drops off the list
 const NEWS_KINDS = EventKind.options.filter((k) => k !== "clock");
 const MAX_CHANGED = 10;
+export const NO_MATCH = "Not a clear match";
 
 // Plumbing sources, not work anyone would @.
 const HIDDEN = (s: Source) => s.external_id === "clock" || s.external_id === "usman-links" || s.external_id.startsWith("smoke-");
@@ -181,8 +182,9 @@ export async function readContext(store: Store, input: z.infer<typeof GetContext
 
 // find_context. With a model (Oct 28), the query is a description in the
 // user's own words: Muse Spark picks the session they mean from recent ones,
-// and contexts come back best first, then up to 3 alternatives; empty when
-// nothing fits. Without a model, or if the call fails, every query word must
+// and contexts come back best first, then up to 3 alternatives, each with a
+// why. When nothing fits, only the near misses come back, each why starting
+// "Not a clear match". Without a model, or if the call fails, every query word must
 // match (matchesQuery), newest first.
 export async function findContext(store: Store, input: z.infer<typeof FindContextInput>, model?: JsonModel) {
   const scope = { ...(input.project_id && { project_id: input.project_id }) };
@@ -202,8 +204,10 @@ export async function findContext(store: Store, input: z.infer<typeof FindContex
     try {
       const found = await searchByDescription(model, input.query, candidates, new Date().toISOString());
       const byId = new Map(all.map((e) => [e.source_id, e]));
-      const picked = found.best ? [found.best, ...found.alternatives] : [];
-      return { contexts: picked.map((m) => byId.get(m.id)!).slice(0, input.limit ?? 30) };
+      const picked = found.best
+        ? [found.best, ...found.alternatives]
+        : found.alternatives.map((a) => ({ id: a.id, why: `${NO_MATCH}: ${a.why}` }));
+      return { contexts: picked.map((m) => ({ ...byId.get(m.id)!, why: m.why })).slice(0, input.limit ?? 30) };
     } catch {
       // fall through to keyword matching: a failed model call shouldn't leave the user with nothing
     }

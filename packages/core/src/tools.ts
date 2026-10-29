@@ -175,6 +175,10 @@ export const ContextEntry = z.object({
   tool: z.string(), // "Cursor", "Claude Code", ...
   title: z.string().optional(),
   last_at: Timestamp,
+  // find_context only, when searched by description: one line on why this
+  // session fits. Starts "Not a clear match" when nothing fit and these are
+  // only near misses (added Oct 28, Usman OK'd).
+  why: z.string().optional(),
 });
 export type ContextEntry = z.infer<typeof ContextEntry>;
 

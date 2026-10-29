@@ -99,7 +99,7 @@ describe("contexts: search by description", () => {
     const seen: string[] = [];
     const model = ranker((u) => ({ best: idOf(u, "Login page wiring"), alternatives: [{ id: idOf(u, "Auth refactor: middleware done"), why: "same feature" }] }), seen);
     const found: any = await callTool(store, "find_context", { query: "the login work from cursor yesterday" }, { model });
-    expect(found.contexts.map((c: any) => c.title)).toEqual(["Login page wiring", "Auth refactor: middleware done"]);
+    expect(found.contexts.map((c: any) => [c.title, c.why])).toEqual([["Login page wiring", "fits"], ["Auth refactor: middleware done", "same feature"]]);
     expect(seen[0]).toContain("Request: the login work from cursor yesterday");
     expect(seen[0]).toContain("said: Login page ships Friday");
   });
@@ -108,6 +108,8 @@ describe("contexts: search by description", () => {
     const { store } = await setup();
     const none: any = await callTool(store, "find_context", { query: "my tax return" }, { model: ranker(() => ({ best: null, alternatives: [] })) });
     expect(none.contexts).toEqual([]);
+    const near: any = await callTool(store, "find_context", { query: "login work in claude code" }, { model: ranker((u) => ({ best: null, alternatives: [{ id: idOf(u, "Login page wiring"), why: "it's in Cursor" }] })) });
+    expect(near.contexts.map((c: any) => c.why)).toEqual(["Not a clear match: it's in Cursor"]);
     const madeUp: any = await callTool(store, "find_context", { query: "x" }, { model: ranker(() => ({ best: "not-a-real-id", alternatives: [] })) });
     expect(madeUp.contexts).toEqual([]);
   });
@@ -116,6 +118,6 @@ describe("contexts: search by description", () => {
     const { store } = await setup();
     const failing: JsonModel = { json: async () => { throw new Error("Meta API 503"); } };
     const found: any = await callTool(store, "find_context", { query: "cursor login" }, { model: failing });
-    expect(found.contexts.map((c: any) => c.title)).toEqual(["Login page wiring"]);
+    expect(found.contexts.map((c: any) => [c.title, c.why])).toEqual([["Login page wiring", undefined]]);
   });
 });
