@@ -24,7 +24,7 @@ describe("coverage", () => {
     const md = renderCoverage(rows, now).join("\n");
     expect(md).toContain("Not saved lately: Cursor (3 days).");
     expect(md).toContain("- Claude Code: last saved");
-    expect(md).toContain(", 2 sessions in the last 7 days");
+    expect(md).toContain(", 2 sessions saved in the last 7 days");
     expect(md).toContain("- Muse Code: nothing saved yet");
     expect(md).not.toContain("Notes");
   });

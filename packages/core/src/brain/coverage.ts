@@ -48,7 +48,7 @@ export function renderCoverage(rows: ToolCoverage[], now: string): string[] {
     }
     const n = r.sources_7d;
     const unit = UNITS[r.kind] ?? ["session", "sessions"];
-    lines.push(`- ${r.tool}: last saved ${formatTime(r.last_saved_at)}, ${n} ${unit[n === 1 ? 0 : 1]} in the last 7 days`);
+    lines.push(`- ${r.tool}: last saved ${formatTime(r.last_saved_at)}, ${n} ${unit[n === 1 ? 0 : 1]} saved in the last 7 days`);
   }
   return lines;
 }

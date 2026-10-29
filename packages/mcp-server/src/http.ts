@@ -3,7 +3,8 @@
 // `npx plumb init`. Per user (Oct 28): every request runs on a ScopedStore for
 // the user behind its bearer token; only /sweep (the owner's watchers) sees all.
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
+import { localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
+import express from "express";
 import {
   IngestInput,
   ListLinkSuggestionsInput,
@@ -61,7 +62,12 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
   const tokens = opts.tokens ?? loadTokens();
   const ownerUserId = opts.ownerUserId ?? process.env.PLUMB_OWNER_USER_ID?.trim();
   const host = opts.host ?? process.env.HOST ?? "0.0.0.0";
-  const app = createMcpExpressApp({ host });
+  // Like the SDK's createMcpExpressApp, but with a body limit that fits a long
+  // session: /ingest takes up to 200k characters, and Express's default 100 KB
+  // turned long transcripts into HTTP 413 (Oct 29 backfill: 23 of 113).
+  const app = express();
+  if (["127.0.0.1", "localhost", "::1"].includes(host)) app.use(localhostHostValidation());
+  app.use(express.json({ limit: "2mb" }));
   const scoped = (req: Request) => new ScopedStore(store, req.plumbUserId!);
 
   app.get("/health", (_req, res) => {

@@ -22,14 +22,22 @@ export async function post(api, path, body, token) {
   return json;
 }
 
-const MAX_CHARS = 180_000; // the server reads at most 200k
+// Index mode reads only a session's start and end (packages/core index-session.ts),
+// so only those are sent: less to upload, and well under the server's body limit.
+const HEAD_CHARS = 10_000;
+const TAIL_CHARS = 30_000;
+
+export function excerpt(text) {
+  if (text.length <= HEAD_CHARS + TAIL_CHARS) return text;
+  return `${text.slice(0, HEAD_CHARS)}\n\n[... ${text.length - HEAD_CHARS - TAIL_CHARS} characters left out ...]\n\n${text.slice(-TAIL_CHARS)}`;
+}
 
 /** Save one session in index mode: a title, a summary and personal or work. */
 export function indexSession(config, { kind, external_id, title, text, at }) {
   const body = {
     index_only: true,
     source: { kind, external_id: String(external_id).slice(0, 200), ...(title && { title: title.slice(0, 200) }) },
-    text: text.length > MAX_CHARS ? text.slice(-MAX_CHARS) : text,
+    text: excerpt(text),
     ...(at && { at }),
   };
   return post(config.api, "/ingest", body, config.token);

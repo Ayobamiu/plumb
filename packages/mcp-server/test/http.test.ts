@@ -112,3 +112,16 @@ describe("http transport", () => {
     });
   });
 });
+
+describe("http transport: body size", () => {
+  it("accepts a long session (about 600 KB) instead of HTTP 413", async () => {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/tools/list_projects`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer test-token" },
+        body: JSON.stringify({ padding: "x".repeat(600_000) }),
+      });
+      expect(res.status).not.toBe(413);
+    });
+  });
+});
