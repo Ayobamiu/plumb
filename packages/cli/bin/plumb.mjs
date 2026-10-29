@@ -6,6 +6,11 @@
 //   plumb status            when Plumb last saved each tool
 // Every text is stripped of secrets before it leaves this machine, and sent in
 // index mode: Plumb keeps a title and a short summary, never the transcript.
+// Node's built-in SQLite (used read-only for Cursor's history) prints an
+// "experimental" warning on first use; it's noise for someone running a CLI.
+const emitWarning = process.emitWarning.bind(process);
+process.emitWarning = (warning, ...rest) => (String(warning).includes("SQLite") ? undefined : emitWarning(warning, ...rest));
+
 import { spawn, execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
@@ -156,7 +161,7 @@ async function backfill() {
   if (!all.length) return;
   console.log("\nPlumb keeps a title and a short summary of each, and marks personal ones. Secrets are stripped first. Sessions already saved are skipped.");
   if (flag("--dry-run") || !(await ask(`Bring in ${all.length} sessions now?`))) {
-    console.log("Nothing sent. Run `npx plumb-ai backfill` when you're ready.\n");
+    console.log(`Nothing sent. Run \`npx plumb-ai backfill\` when you're ready${process.stdin.isTTY ? "" : " (add --yes to skip the question)"}.\n`);
     return;
   }
   await send(config, all);
