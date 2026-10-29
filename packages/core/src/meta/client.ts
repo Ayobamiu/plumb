@@ -16,7 +16,7 @@ export const MUSE_SPARK = configured && !/contributor/i.test(configured) ? confi
 // Oct 29: the key's model list flipped again (standard 1.3 gone, only the
 // contributor 1.3 listed). When the default model answers "not found", calls
 // fall back to the next standard model instead of failing. Never contributor.
-export const MUSE_SPARK_FALLBACKS = ["muse-spark-1.2"].filter((m) => m !== MUSE_SPARK);
+export const MUSE_SPARK_FALLBACKS = ["muse-spark-1.2", "muse-spark-1.1"].filter((m) => m !== MUSE_SPARK);
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -76,12 +76,18 @@ export class MetaClient {
   async json<T>(opts: JsonCallOptions<T>): Promise<T> {
     // Only the default model falls back; a caller that names another model gets that one.
     const chain = (opts.model ?? MUSE_SPARK) === MUSE_SPARK ? [MUSE_SPARK, ...MUSE_SPARK_FALLBACKS] : [opts.model!];
-    for (let i = 0; ; i++) {
-      try {
-        return await this.withRetries({ ...opts, model: chain[i] });
-      } catch (err) {
-        if (!(err instanceof ModelMissingError) || i === chain.length - 1) throw err;
+    // "Not found" flaps call by call (Oct 27 and 29), sometimes for every model at
+    // once: go through the chain again after each wait before giving up.
+    for (let round = 0; ; round++) {
+      for (const model of chain) {
+        try {
+          return await this.withRetries({ ...opts, model });
+        } catch (err) {
+          if (!(err instanceof ModelMissingError)) throw err;
+          if (round === this.retryDelaysMs.length && model === chain.at(-1)) throw err;
+        }
       }
+      await new Promise((resolve) => setTimeout(resolve, this.retryDelaysMs[round]));
     }
   }
 

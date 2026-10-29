@@ -25,18 +25,26 @@ describe("MetaClient retries", () => {
     await expect(new MetaClient("k", [0, 0]).json(opts)).resolves.toEqual({ ok: true });
     const models = fetch.mock.calls.map((c) => JSON.parse(c[1].body).model);
     expect(models).toEqual(["muse-spark-1.3", "muse-spark-1.2"]);
+    expect(models.some((m) => /contributor/.test(m))).toBe(false);
 
-    // Both missing: it says so, without trying anything else.
+    // Both missing for a moment: the chain is tried again after each wait.
+    const flap = vi.fn().mockResolvedValueOnce(missing).mockResolvedValueOnce(missing).mockResolvedValueOnce(missing).mockResolvedValueOnce(good);
+    vi.stubGlobal("fetch", flap);
+    await expect(new MetaClient("k", [0, 0]).json(opts)).resolves.toEqual({ ok: true });
+    expect(flap.mock.calls.map((c) => JSON.parse(c[1].body).model)).toEqual(["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.1", "muse-spark-1.3"]);
+
+    // Missing every time: it says so after three rounds, never trying a contributor model.
     const none = vi.fn().mockResolvedValue(missing);
     vi.stubGlobal("fetch", none);
     await expect(new MetaClient("k", [0, 0]).json(opts)).rejects.toThrow(/model was not found/);
-    expect(none.mock.calls.map((c) => JSON.parse(c[1].body).model)).toEqual(["muse-spark-1.3", "muse-spark-1.2"]);
+    const tried = none.mock.calls.map((c) => JSON.parse(c[1].body).model);
+    expect(tried).toEqual(Array(3).fill(["muse-spark-1.3", "muse-spark-1.2", "muse-spark-1.1"]).flat());
 
-    // A caller that names a model gets only that model.
+    // A caller that names a model gets only that model (retried, never swapped).
     const named = vi.fn().mockResolvedValue(missing);
     vi.stubGlobal("fetch", named);
     await expect(new MetaClient("k", [0, 0]).json({ ...opts, model: "muse-spark-1.1" })).rejects.toThrow();
-    expect(named).toHaveBeenCalledTimes(1);
+    expect(new Set(named.mock.calls.map((c) => JSON.parse(c[1].body).model))).toEqual(new Set(["muse-spark-1.1"]));
   });
 
   it("gives up after three attempts", async () => {
