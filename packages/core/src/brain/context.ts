@@ -12,13 +12,14 @@ const TOOLS: Record<SourceKind, { slug: string; label: string; words: string[] }
   doc: { slug: "doc", label: "Doc", words: ["doc", "docs", "document"] },
   gmail_thread: { slug: "gmail", label: "Email", words: ["gmail", "email", "mail", "thread"] },
   manual: { slug: "notes", label: "Notes", words: ["notes", "note", "manual"] },
+  muse_code: { slug: "muse-code", label: "Muse Code", words: ["muse", "code", "muse-code"] },
 };
 
 export const toolLabel = (kind: SourceKind) => TOOLS[kind].label;
 
 // Placeholder titles hooks have sent. They don't name anything, so they never
 // count as the tool's own title, and listings show a summary snippet instead.
-const GENERIC_TITLES = new Set(["claude code session", "claude code turn", "cursor session", "cursor agent response", "cursor turn", "claude chat", "homepage notes"]);
+const GENERIC_TITLES = new Set(["claude code session", "claude code turn", "cursor session", "cursor agent response", "cursor turn", "claude chat", "homepage notes", "muse code session"]);
 export const isGenericTitle = (title: string | undefined) => !title?.trim() || GENERIC_TITLES.has(title.trim().toLowerCase());
 
 /** The title to show: the real one, or else the start of the latest summary. */

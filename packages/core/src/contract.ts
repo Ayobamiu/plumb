@@ -10,7 +10,7 @@ export type ClaimStatus = z.infer<typeof ClaimStatus>;
 export const ClaimKind = z.enum(["status", "decision", "fact", "next_step", "open_question", "goal"]);
 export type ClaimKind = z.infer<typeof ClaimKind>;
 
-export const SourceKind = z.enum(["gmail_thread", "doc", "claude_code", "cursor", "claude_chat", "manual"]);
+export const SourceKind = z.enum(["gmail_thread", "doc", "claude_code", "cursor", "claude_chat", "manual", "muse_code"]); // muse_code added Oct 28, Usman OK'd
 export type SourceKind = z.infer<typeof SourceKind>;
 
 export const EventKind = z.enum(["email_received", "email_sent", "doc_edited", "session_note", "clock"]);

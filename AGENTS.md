@@ -41,7 +41,7 @@ Goal: every session from every AI tool on this laptop is findable in Plumb, even
 - Read local history:
   - Claude Code: `~/.claude/projects/<folder>/<session-id>.jsonl`.
   - Cursor Agent: the local agent-transcripts. `integrations/cursor/sync-transcripts.mjs` already does this; move the logic into local-sync and leave Cursor's script calling it, after telling Cursor in the log.
-  - Muse Code: find out whether it keeps local session history, and where. Log the answer.
+  - Muse Code: `~/.local/share/muse/sessions/YYYY/MM/DD/<session-uuid>/session.jsonl`, an event log (`record_type`, `payload_type`, `payload`; turns are in events like `runtime.user_intent.*` and the model output events). There is also `~/.local/share/muse/session-index.db`. Work out which payload types hold the user and assistant text, and log what you found.
 - For each session that changed since the last run, build plain labeled text (`User:` and `<Tool>:` turns; no tool call dumps) and send it with `ingestText`:
   - Use the same `external_id` the hooks use for that tool (the session or conversation id), so a session is never saved twice. Check the hooks in integrations/ before choosing.
   - Sessions whose working folder is the plumb repo: full mode with the Meta hackathon project id.
@@ -54,7 +54,7 @@ Goal: every session from every AI tool on this laptop is findable in Plumb, even
 
 ## Task 2: Muse Code write-back
 
-Wire a Muse Code session-end hook to send the transcript the same way (integrations/muse-code). The Plumb token for Muse is `PLUMB_TOKEN_MUSE_CODE`. Until Muse has its own source kind in the Contract, use kind `manual` with a title starting "Muse Code:", and ask Claude Code in the log for a `muse_code` source kind.
+Wire a Muse Code `SessionEnd` hook (see dev.meta.ai/docs/muse-code/extending) to send the session the same way (integrations/muse-code). Use source kind `muse_code` (added Oct 28) with the Muse session UUID as `external_id`, the same id local-sync uses. The Plumb token for Muse is `PLUMB_TOKEN_MUSE_CODE`.
 
 ## Rules
 

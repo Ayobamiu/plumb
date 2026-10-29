@@ -164,6 +164,19 @@ describe("ingest: index mode", () => {
     expect([...(store as any).sources].find((s: any) => s.external_id === "conv-idx").label).toBe("personal");
   });
 
+  it("lists a Muse Code session as its own tool, found by 'muse' but not by 'claude code'", async () => {
+    const { store } = await setup();
+    await ingest(store, indexer({ title: "Local sync dry run", summary: "Counted sessions per tool without sending.", personal: false }), {
+      index_only: true,
+      source: { kind: "muse_code", external_id: "01a17ffd-6774-7081-a842-0c78829944ff", title: "Muse Code session" },
+      text: "User: dry run the sync",
+    });
+    const [entry] = await listContexts(store, { query: "muse sync" });
+    expect(entry).toMatchObject({ tool: "Muse Code", title: "Local sync dry run" });
+    expect(entry!.uri).toMatch(/^muse-code:\/\/local-sync-dry-run-[0-9a-f]{8}$/);
+    expect(await listContexts(store, { query: "claude code sync" })).toEqual([]);
+  });
+
   it("saves nothing when indexing fails, and full mode still needs a project", async () => {
     const { store } = await setup();
     const failing: JsonModel = { json: async () => { throw new Error("Meta API 503"); } };
