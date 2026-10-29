@@ -19,11 +19,12 @@ function expect(ok: boolean, what: string) {
   console.log(`ok  ${what}`);
 }
 
-const found = await db.from("projects").select("id").eq("name", "Smoke test").limit(1);
+const owner = process.env.PLUMB_OWNER_USER_ID!;
+const found = await db.from("projects").select("id").eq("name", "Smoke test").eq("user_id", owner).limit(1);
 if (found.error) throw new Error(found.error.message);
 let projectId = found.data[0]?.id as string | undefined;
 if (!projectId) {
-  const created = await db.from("projects").insert({ name: "Smoke test" }).select("id").single();
+  const created = await db.from("projects").insert({ name: "Smoke test", user_id: owner }).select("id").single();
   if (created.error) throw new Error(created.error.message);
   projectId = created.data.id as string;
 }
