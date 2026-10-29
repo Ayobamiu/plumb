@@ -1,0 +1,13 @@
+# Railway config for the homepage service (repo-root build context).
+# Service variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, PLUMB_API_URL
+# (the mcp service URL), RAILWAY_DOCKERFILE_PATH=apps/web/deploy/Dockerfile.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "apps/web/deploy/Dockerfile"
+
+[deploy]
+healthcheckPath = "/device"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
