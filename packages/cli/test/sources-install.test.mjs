@@ -73,3 +73,14 @@ test("install merges into existing settings, keeps a backup, and is idempotent",
   const h = JSON.parse(readFileSync(join(tmp, ".cursor", "hooks.json"), "utf8"));
   assert.equal(h.hooks.stop.length, 1);
 });
+
+test("an update refreshes the hooks' copy; nothing happens if hooks were never installed", async () => {
+  const { copyApp, refreshApp, appDir } = await import("../lib/install.mjs");
+  const pkgPath = join(appDir(), "package.json");
+  refreshApp(); // no copy yet: stays absent
+  assert.ok(!existsSync(pkgPath));
+  copyApp();
+  writeFileSync(pkgPath, JSON.stringify({ version: "0.0.1" }));
+  refreshApp();
+  assert.notEqual(JSON.parse(readFileSync(pkgPath, "utf8")).version, "0.0.1");
+});

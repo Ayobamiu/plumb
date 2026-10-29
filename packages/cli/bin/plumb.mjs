@@ -19,7 +19,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { indexSession, post, PlumbError } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
-import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor } from "../lib/install.mjs";
+import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, refreshApp } from "../lib/install.mjs";
 import { scrub } from "../lib/scrub.mjs";
 import { listClaudeCodeSessions, readClaudeCodeTranscript } from "../lib/sources/claude-code.mjs";
 import { listCursorChats } from "../lib/sources/cursor.mjs";
@@ -250,6 +250,13 @@ async function hookSend() {
 
 const commands = { init, backfill, import: importExport, status, hook, "hook-send": hookSend };
 const run = commands[cmd];
+if (run && !cmd.startsWith("hook")) {
+  try {
+    refreshApp();
+  } catch {
+    /* an old copy still works; never block a command on this */
+  }
+}
 if (!run) {
   console.log("Usage: plumb init | backfill [--tool claude-code|cursor] [--dry-run] [--yes] | import <zip> | status");
   process.exit(cmd ? 1 : 0);

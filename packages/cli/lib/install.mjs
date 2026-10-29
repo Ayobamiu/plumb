@@ -35,6 +35,20 @@ export function copyApp() {
   for (const part of ["bin", "lib", "assets", "package.json"]) cpSync(join(pkgDir, part), join(appDir(), part), { recursive: true });
 }
 
+const versionOf = (dir) => {
+  try {
+    return JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).version;
+  } catch {
+    return undefined;
+  }
+};
+
+/** After an update (npx plumb-ai@latest ...), the hooks' copy follows. Only if hooks were installed. */
+export function refreshApp() {
+  const installed = versionOf(appDir());
+  if (installed && installed !== versionOf(pkgDir)) copyApp();
+}
+
 function writeCommand(dir) {
   mkdirSync(dir, { recursive: true });
   copyFileSync(join(pkgDir, "assets", "plumb-command.md"), join(dir, "plumb.md"));
