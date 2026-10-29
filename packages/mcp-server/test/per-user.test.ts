@@ -42,7 +42,7 @@ describe("per user: one user never sees or touches another's data", () => {
 
 async function withServer(run: (base: string, store: MemoryStore) => Promise<void>) {
   const store = new MemoryStore();
-  const sessions: Record<string, string> = { "session-of-new-user": "user-new" };
+  const sessions: Record<string, string> = { "session-of-new-user": "user-new", "eyJ-of-new-user": "user-new" };
   const app = createHttpApp({ store, tokens: new Map(), ownerUserId: MEMORY_USER, host: "127.0.0.1", webUrl: "https://plumb.example", verifySession: async (t) => sessions[t] });
   const server = createServer(app);
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -84,6 +84,10 @@ describe("device sign-in (npx plumb init)", () => {
       const projects = (await (await post(base, "/tools/list_projects", {}, got.access_token)).json()) as any;
       expect(projects.projects.map((p: any) => p.name)).toEqual(["My work"]);
       expect((await post(base, "/sweep", {}, got.access_token)).status).toBe(403);
+      // The homepage forwards a signed-in session instead: same user, same scope.
+      const viaSession = (await (await post(base, "/tools/list_projects", {}, "eyJsession")).json()) as any;
+      expect(viaSession.error).toBe("sign in again");
+      expect((await post(base, "/tools/list_projects", {}, "eyJ-of-new-user")).status).toBe(200);
       expect((await (await post(base, "/auth/device/token", { device_code: "wrong" })).json()) as any).toEqual({ error: "expired_token" });
     });
   });

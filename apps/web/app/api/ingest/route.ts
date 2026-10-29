@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth-server";
+import { plumbApiBase } from "@/lib/plumb-api";
 
 type Body = {
   project_id?: unknown;
@@ -11,6 +13,8 @@ type Body = {
  * Until extraction lands, this returns 501.
  */
 export async function POST(request: Request) {
+  const signed = await requireUser(request);
+  if (signed instanceof Response) return signed;
   let raw: Body;
   try {
     raw = (await request.json()) as Body;
@@ -27,7 +31,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const base = process.env.PLUMB_INGEST_URL;
+  const api = plumbApiBase();
+  const base = api ? `${api}/ingest` : undefined;
   if (!base) {
     return NextResponse.json(
       {
@@ -43,9 +48,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        ...(process.env.PLUMB_INGEST_TOKEN
-          ? { authorization: `Bearer ${process.env.PLUMB_INGEST_TOKEN}` }
-          : {}),
+        authorization: signed.authorization, // saved as this user's note
       },
       body: JSON.stringify({
         project_id: projectId,

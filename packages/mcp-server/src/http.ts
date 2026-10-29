@@ -69,11 +69,12 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
   });
 
   // Device sign-in: no bearer token yet (approve checks the user's session instead).
+  const verifySession = opts.verifySession ?? ((t: string) => supabase!.verifySession(t));
   const device = deviceRoutes({
     store,
     auth: store,
     webUrl: opts.webUrl ?? process.env.PLUMB_WEB_URL ?? "http://localhost:3000",
-    verifySession: opts.verifySession ?? ((t) => supabase!.verifySession(t)),
+    verifySession,
   });
   const safe = (fn: (req: Request, res: Response) => Promise<void>) => (req: Request, res: Response) => {
     fn(req, res).catch((err) => sendToolError(res, err));
@@ -83,7 +84,7 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
   app.post("/auth/device/token", safe(device.token));
 
   // Auth for every mutating / listing surface. Health stays open for the host.
-  app.use(["/mcp", "/tools", "/ingest", "/links", "/sweep"], requireBearer({ tokens, ownerUserId, auth: store }));
+  app.use(["/mcp", "/tools", "/ingest", "/links", "/sweep"], requireBearer({ tokens, ownerUserId, auth: store, verifySession }));
 
   app.post("/tools/:name", async (req: Request, res: Response) => {
     const raw = req.params.name;

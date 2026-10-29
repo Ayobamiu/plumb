@@ -10,6 +10,7 @@ import type {
 } from "@plumb/core";
 import { hasServerDb } from "@/lib/env";
 import { getServerSupabase } from "@/lib/supabase-server";
+import { requireUser } from "@/lib/auth-server";
 
 function asClaim(row: Record<string, unknown>): Claim {
   return {
@@ -77,6 +78,8 @@ function asReason(row: Record<string, unknown>): Reason {
 }
 
 export async function GET(request: Request) {
+  const signed = await requireUser(request);
+  if (signed instanceof Response) return signed;
   if (!hasServerDb()) {
     return NextResponse.json(
       { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
@@ -100,6 +103,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "claim not found" }, { status: 404 });
     }
     const claim = asClaim(claimRow as Record<string, unknown>);
+    // Per user: the claim's project must be this user's.
+    const { data: owned } = await db.from("projects").select("id").eq("id", claim.project_id).eq("user_id", signed.userId).maybeSingle();
+    if (!owned) return NextResponse.json({ error: "claim not found" }, { status: 404 });
 
     const { data: sourceRow, error: sourceError } = await db
       .from("sources")

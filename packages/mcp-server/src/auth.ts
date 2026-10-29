@@ -64,6 +64,8 @@ export interface BearerOptions {
   tokens: TokenMap; // env tokens, owner's
   ownerUserId?: string; // PLUMB_OWNER_USER_ID
   auth?: AuthStore; // personal tokens
+  /** A homepage session (Supabase Auth access token) acts as its user. */
+  verifySession?: (accessToken: string) => Promise<string | undefined>;
 }
 
 /** Reject requests with no valid bearer token; set req.plumbUserId and req.plumbTool. */
@@ -88,6 +90,14 @@ export function requireBearer(opts: BearerOptions) {
     }
 
     try {
+      // The homepage forwards the signed-in user's session (a JWT) instead of a Plumb token.
+      if (token.startsWith("eyJ") && opts.verifySession) {
+        const userId = await opts.verifySession(token);
+        if (!userId) return deny("sign in again");
+        req.plumbTool = "web";
+        req.plumbUserId = userId;
+        return next();
+      }
       const found = opts.auth ? await opts.auth.findToken(hashToken(token)) : undefined;
       if (!found || found.revoked_at) return deny("invalid bearer token");
       req.plumbTool = found.tool;

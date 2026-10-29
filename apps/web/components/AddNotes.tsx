@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/auth-fetch";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -19,7 +20,7 @@ export function AddNotes({ projectId }: Props) {
     setBusy(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/ingest", {
+      const res = await authFetch("/api/ingest", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

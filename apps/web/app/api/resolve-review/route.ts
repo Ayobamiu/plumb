@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth-server";
+import { plumbApiBase } from "@/lib/plumb-api";
 
 type ResolveBody = {
   claim_id: string;
@@ -6,17 +8,6 @@ type ResolveBody = {
   text?: string;
   note?: string;
 };
-
-/** MCP HTTP API base (no trailing /mcp or /ingest). */
-function plumbApiBase(): string | null {
-  const explicit = process.env.PLUMB_API_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
-  const ingest = process.env.PLUMB_INGEST_URL?.trim();
-  if (ingest) return ingest.replace(/\/ingest\/?$/, "");
-  const mcp = process.env.PLUMB_MCP_URL?.trim();
-  if (mcp) return mcp.replace(/\/mcp\/?$/, "");
-  return null;
-}
 
 function parseBody(raw: unknown): ResolveBody | { error: string } {
   if (!raw || typeof raw !== "object") return { error: "invalid JSON body" };
@@ -35,6 +26,8 @@ function parseBody(raw: unknown): ResolveBody | { error: string } {
 
 /** Proxies to remote POST /tools/resolve_review. */
 export async function POST(request: Request) {
+  const signed = await requireUser(request);
+  if (signed instanceof Response) return signed;
   let raw: unknown;
   try {
     raw = await request.json();
@@ -55,7 +48,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const token = process.env.PLUMB_MCP_TOKEN || process.env.PLUMB_TOKEN_WEB;
+  const token = signed.authorization.replace(/^Bearer\s+/i, "");
   try {
     const res = await fetch(`${base}/tools/resolve_review`, {
       method: "POST",

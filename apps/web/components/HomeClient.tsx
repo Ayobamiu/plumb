@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/auth-fetch";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Claim, ClaimKind } from "@plumb/core";
@@ -8,6 +9,8 @@ import { kindLabel, KIND_ORDER } from "@/lib/kinds";
 import { AddNotes } from "./AddNotes";
 import { ClaimPanel } from "./ClaimPanel";
 import { ReviewActions } from "./ReviewActions";
+import { SessionSearch } from "./SessionSearch";
+import { SuggestedLinks } from "./SuggestedLinks";
 
 type Props = {
   projects: ProjectWithCounts[];
@@ -15,12 +18,17 @@ type Props = {
   since: string;
   error?: string;
   realtimeReady: boolean;
+  onRefresh?: () => void | Promise<void>; // reload data (per user: the page loads it in the browser)
 };
 
 function sourceLabel(item: FeedItem): string {
   if (!item.source) return "unknown source";
   const title = item.source.title ?? item.source.external_id;
-  return `${item.source.kind} · ${title}`;
+  const kind =
+    item.source.label === "personal"
+      ? `${item.source.kind} (personal)`
+      : item.source.kind;
+  return `${kind} · ${title}`;
 }
 
 function FeedBlock({
@@ -62,7 +70,7 @@ function FeedBlock({
   );
 }
 
-export function HomeClient({ projects, feed, since, error, realtimeReady }: Props) {
+export function HomeClient({ projects, feed, since, error, realtimeReady, onRefresh }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
@@ -73,34 +81,40 @@ export function HomeClient({ projects, feed, since, error, realtimeReady }: Prop
   const [claimsError, setClaimsError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
+    if (onRefresh) return void onRefresh();
     startTransition(() => {
       router.refresh();
     });
-  }, [router]);
+  }, [router, onRefresh]);
 
   useEffect(() => {
-    if (!realtimeReady) return;
-    let cancelled = false;
-    let channel: { unsubscribe: () => void } | null = null;
+    if (realtimeReady) {
+      let cancelled = false;
+      let channel: { unsubscribe: () => void } | null = null;
 
-    void (async () => {
-      const { getBrowserSupabase } = await import("@/lib/supabase-browser");
-      const client = getBrowserSupabase();
-      if (!client || cancelled) return;
-      channel = client
-        .channel("transitions-feed")
-        .on(
-          "postgres_changes",
-          { event: "INSERT", schema: "public", table: "transitions" },
-          () => refresh(),
-        )
-        .subscribe();
-    })();
+      void (async () => {
+        const { getBrowserSupabase } = await import("@/lib/supabase-browser");
+        const client = getBrowserSupabase();
+        if (!client || cancelled) return;
+        channel = client
+          .channel("transitions-feed")
+          .on(
+            "postgres_changes",
+            { event: "INSERT", schema: "public", table: "transitions" },
+            () => refresh(),
+          )
+          .subscribe();
+      })();
 
-    return () => {
-      cancelled = true;
-      channel?.unsubscribe();
-    };
+      return () => {
+        cancelled = true;
+        channel?.unsubscribe();
+      };
+    }
+
+    // No signed-in realtime yet: poll so the feed stays current without a laptop.
+    const id = window.setInterval(() => refresh(), 15_000);
+    return () => window.clearInterval(id);
   }, [realtimeReady, refresh]);
 
   useEffect(() => {
@@ -112,7 +126,7 @@ export function HomeClient({ projects, feed, since, error, realtimeReady }: Prop
     setClaimsError(null);
     void (async () => {
       try {
-        const res = await fetch(
+        const res = await authFetch(
           `/api/project-claims?project_id=${encodeURIComponent(expandedProjectId)}`,
         );
         const body = (await res.json()) as {
@@ -141,8 +155,8 @@ export function HomeClient({ projects, feed, since, error, realtimeReady }: Prop
       ) : null}
       {!realtimeReady && !error ? (
         <div className="banner">
-          Live updates need NEXT_PUBLIC_SUPABASE_ANON_KEY and a read policy on transitions.
-          The page still loads over the service role.
+          Polling every 15s. For push updates, add NEXT_PUBLIC_SUPABASE_ANON_KEY and a
+          read policy on transitions.
         </div>
       ) : null}
 
@@ -159,6 +173,13 @@ export function HomeClient({ projects, feed, since, error, realtimeReady }: Prop
           </div>
         )}
       </section>
+
+      <SuggestedLinks
+        projectIds={projects.map((p) => p.id)}
+        onOpen={setSelectedClaimId}
+      />
+
+      <SessionSearch projectId={expandedProjectId ?? firstProjectId} />
 
       <section>
         <h2>Projects</h2>

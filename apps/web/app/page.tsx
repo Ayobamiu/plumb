@@ -1,6 +1,5 @@
-import { HomeClient } from "@/components/HomeClient";
-import { hasBrowserRealtime, hasServerDb } from "@/lib/env";
-import { loadHomeData } from "@/lib/data";
+import { Home } from "@/components/Home";
+import { hasServerDb } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +22,6 @@ export default async function HomePage() {
     );
   }
 
-  const data = await loadHomeData();
-
   return (
     <main>
       <p className="brand">Plumb</p>
@@ -33,13 +30,7 @@ export default async function HomePage() {
         Claims that went OUT or REVIEW, grouped with what broke them. Projects
         below show what is still IN.
       </p>
-      <HomeClient
-        projects={data.projects}
-        feed={data.feed}
-        since={data.since}
-        error={data.error}
-        realtimeReady={hasBrowserRealtime()}
-      />
+      <Home />
     </main>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/auth-fetch";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -17,7 +18,7 @@ export function ReviewActions({ claimId, claimText }: Props) {
 
   async function post(body: Record<string, unknown>) {
     setError(null);
-    const res = await fetch("/api/resolve-review", {
+    const res = await authFetch("/api/resolve-review", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),

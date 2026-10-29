@@ -70,6 +70,8 @@ function rowToSource(row: Record<string, unknown>): Source {
     external_id: String(row.external_id),
     uri: row.uri ? String(row.uri) : undefined,
     title: row.title ? String(row.title) : undefined,
+    label: row.label === "personal" ? "personal" : undefined,
+    project_id: row.project_id ? String(row.project_id) : undefined,
   };
 }
 
@@ -91,13 +93,15 @@ export function defaultSince(): string {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 }
 
-export async function loadHomeData(since = defaultSince()): Promise<HomeData> {
+/** Per user (Oct 28): only the signed-in user's projects, and changes to their claims. */
+export async function loadHomeData(userId: string, since = defaultSince()): Promise<HomeData> {
   try {
     const db = getServerSupabase();
 
     const { data: projectsRaw, error: projectsError } = await db
       .from("projects")
       .select("id, name, created_at")
+      .eq("user_id", userId)
       .order("created_at", { ascending: true });
     if (projectsError) throw projectsError;
 
@@ -119,18 +123,23 @@ export async function loadHomeData(since = defaultSince()): Promise<HomeData> {
       projects.push({ ...project, counts });
     }
 
+    const ownProjectIds = (projectsRaw ?? []).map((p) => String((p as { id: unknown }).id));
+    if (ownProjectIds.length === 0) return { projects, feed: [], since };
+    // Only transitions on this user's claims (joined through claims.project_id).
     const { data: transitionsRaw, error: transitionsError } = await db
       .from("transitions")
-      .select("*")
+      .select("*, claims!transitions_claim_id_fkey!inner(project_id)")
+      .in("claims.project_id", ownProjectIds)
       .in("to_status", ["OUT", "REVIEW"])
       .gte("at", since)
       .order("at", { ascending: false })
       .limit(100);
     if (transitionsError) throw transitionsError;
 
-    const transitions = (transitionsRaw ?? []).map((r) =>
-      rowToTransition(r as Record<string, unknown>),
-    );
+    const transitions = (transitionsRaw ?? []).map((r) => {
+      const { claims: _joined, ...row } = r as Record<string, unknown>;
+      return rowToTransition(row);
+    });
 
     const claimIds = [...new Set(transitions.map((t) => t.claim_id))];
     const eventIds = [...new Set(transitions.map((t) => t.event_id).filter(Boolean))] as string[];
@@ -235,8 +244,11 @@ export async function loadHomeData(since = defaultSince()): Promise<HomeData> {
 
 export async function loadProjectInClaims(
   projectId: string,
-): Promise<Partial<Record<ClaimKind, Claim[]>>> {
+  userId: string,
+): Promise<Partial<Record<ClaimKind, Claim[]>> | undefined> {
   const db = getServerSupabase();
+  const { data: owned } = await db.from("projects").select("id").eq("id", projectId).eq("user_id", userId).maybeSingle();
+  if (!owned) return undefined; // not this user's project
   const { data, error } = await db
     .from("claims")
     .select("*")

@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/auth-fetch";
 import { useEffect, useState } from "react";
 import type { Claim, Reason, Source, Transition } from "@plumb/core";
 
@@ -51,7 +52,7 @@ export function ClaimPanel({ claimId, onClose }: Props) {
     setError(null);
     void (async () => {
       try {
-        const res = await fetch(`/api/explain-claim?claim_id=${encodeURIComponent(claimId)}`);
+        const res = await authFetch(`/api/explain-claim?claim_id=${encodeURIComponent(claimId)}`);
         const body = (await res.json()) as ExplainPayload & { error?: string };
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
         if (!cancelled) setData(body);
@@ -92,6 +93,7 @@ export function ClaimPanel({ claimId, onClose }: Props) {
             <dt>Source</dt>
             <dd>
               {data.source.kind}
+              {data.source.label === "personal" ? " (personal)" : ""}
               {data.source.title ? ` · ${data.source.title}` : ""}
             </dd>
             <dt>Reasons</dt>
