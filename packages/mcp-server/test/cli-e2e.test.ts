@@ -59,7 +59,7 @@ describe("npx plumb-ai init, end to end", () => {
     const cwd = join(home, "repo", "src"); // a subfolder: the session lands in the repo's project
     writeFileSync(join(proj, "s-gym.jsonl"), JSON.stringify({ cwd, timestamp: "2026-10-20T10:00:00Z", message: { role: "user", content: "Plan my gym week. My key is META_MODEL_API_KEY=abcdef123456789" } }) + "\n");
     writeFileSync(join(proj, "s-auth.jsonl"), JSON.stringify({ cwd, timestamp: "2026-10-21T10:00:00Z", message: { role: "user", content: "Refactor auth to one token per tool" } }) + "\n");
-    const env = { HOME: home, PLUMB_HOME: join(home, ".plumb"), PLUMB_CURSOR_DB: join(home, "none.vscdb"), PATH: "/usr/bin:/bin" };
+    const env = { HOME: home, PLUMB_HOME: join(home, ".plumb"), PLUMB_CURSOR_DB: join(home, "none.vscdb"), PATH: "/usr/bin:/bin", PLUMB_SKIP_LAUNCHCTL: "1" };
 
     try {
       let approved = false;

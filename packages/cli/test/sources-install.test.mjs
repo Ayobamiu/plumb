@@ -72,6 +72,7 @@ test("install merges into existing settings, keeps a backup, and is idempotent",
   assert.equal(m.mcpServers.plumb.headers.Authorization, "Bearer plumb_test");
   const h = JSON.parse(readFileSync(join(tmp, ".cursor", "hooks.json"), "utf8"));
   assert.equal(h.hooks.stop.length, 1);
+  assert.equal(h.hooks.sessionEnd.length, 1);
 });
 
 test("an update refreshes the hooks' copy; nothing happens if hooks were never installed", async () => {
@@ -83,4 +84,15 @@ test("an update refreshes the hooks' copy; nothing happens if hooks were never i
   writeFileSync(pkgPath, JSON.stringify({ version: "0.0.1" }));
   refreshApp();
   assert.notEqual(JSON.parse(readFileSync(pkgPath, "utf8")).version, "0.0.1");
+});
+
+test("the hourly sync job is written to run plumb sync from the stable copy", async () => {
+  process.env.PLUMB_SKIP_LAUNCHCTL = "1";
+  const { installSync } = await import("../lib/install.mjs");
+  const out = installSync();
+  if (process.platform === "darwin") {
+    const plist = readFileSync(join(tmp, "Library", "LaunchAgents", "ai.plumb.sync.plist"), "utf8");
+    assert.match(plist, /<integer>3600<\/integer>/);
+    assert.match(plist, /\.plumb\/app\/bin\/plumb\.mjs<\/string><string>sync<\/string>/);
+  } else assert.match(out[0], /crontab/);
 });

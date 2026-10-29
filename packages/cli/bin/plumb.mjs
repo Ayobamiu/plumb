@@ -20,7 +20,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { post, PlumbError, saveSession } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
-import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, refreshApp } from "../lib/install.mjs";
+import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, installSync, refreshApp } from "../lib/install.mjs";
 import { scrub } from "../lib/scrub.mjs";
 import { listClaudeCodeSessions, readClaudeCodeTranscript } from "../lib/sources/claude-code.mjs";
 import { listCursorChats } from "../lib/sources/cursor.mjs";
@@ -96,6 +96,7 @@ async function init() {
     }
     console.log(`${name}: ${install(config).join("; ")}.`);
   }
+  console.log(`Safety net: ${installSync().join("; ")}.`);
   console.log("\nNew sessions now save on their own. Restart Claude Code and Cursor to load the changes.\n");
 
   if (!flag("--no-backfill")) await backfill();
@@ -191,6 +192,15 @@ async function backfill() {
   console.log();
 }
 
+/** The hourly safety net: save whatever changed in local history, without asking. */
+async function sync() {
+  const config = loadConfig();
+  if (!config?.token) return;
+  const sessions = [...listClaudeCodeSessions(), ...(await listCursorChats())];
+  const r = await send(config, sessions, { quiet: true });
+  if (r.sent || r.failed) hookLog(`sync: saved ${r.sent}, failed ${r.failed}${r.stop ? ` (${r.stop})` : ""}`);
+}
+
 async function importExport() {
   const config = need();
   const path = args[1];
@@ -235,7 +245,7 @@ async function hook() {
   if (tool === "cursor") process.stdout.write("{}\n");
   const id = tool === "cursor" ? input.conversation_id : input.session_id;
   if (!id) return;
-  const final = input.hook_event_name === "SessionEnd";
+  const final = /sessionend/i.test(String(input.hook_event_name ?? ""));
   // Send in the background, so the tool isn't kept waiting on the network.
   const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "hook-send", tool, id, input.transcript_path ?? "", final ? "final" : "mid"], { detached: true, stdio: "ignore" });
   child.unref();
@@ -268,7 +278,7 @@ async function hookSend() {
   }
 }
 
-const commands = { init, backfill, import: importExport, status, hook, "hook-send": hookSend };
+const commands = { init, backfill, import: importExport, status, sync, hook, "hook-send": hookSend };
 const run = commands[cmd];
 if (run && !cmd.startsWith("hook")) {
   try {
@@ -282,7 +292,7 @@ if (!run) {
   process.exit(cmd ? 1 : 0);
 }
 run().catch((err) => {
-  if (cmd?.startsWith("hook")) return hookLog(`error: ${err.message}`);
+  if (cmd?.startsWith("hook") || cmd === "sync") return hookLog(`${cmd} error: ${err.message}`);
   console.error(err.message);
   process.exit(1);
 });
