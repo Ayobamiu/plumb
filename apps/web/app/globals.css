@@ -481,3 +481,44 @@ section > h2 {
     gap: 0.25rem;
   }
 }
+
+/* Getting started (Oct 29) */
+.steps {
+  padding-left: 20px;
+}
+
+.steps li {
+  margin-bottom: 20px;
+}
+
+.steps p {
+  margin: 0 0 8px;
+}
+
+.command {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  margin: 8px 0;
+}
+
+.command code {
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.command button {
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  padding: 4px 10px;
+  cursor: pointer;
+}
