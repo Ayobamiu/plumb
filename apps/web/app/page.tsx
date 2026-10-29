@@ -13,10 +13,7 @@ export default async function HomePage() {
           One question: what stopped being true since you last looked, and why?
         </p>
         <div className="banner error" role="alert">
-          Missing SUPABASE_SERVICE_ROLE_KEY in the repo root .env. The homepage
-          reads through the service role until RLS read policies land. Add the
-          key from the Supabase dashboard (Settings → API), then restart{" "}
-          <code>pnpm --filter @plumb/web dev</code>.
+          Plumb isn't set up on this site yet. Please try again later.
         </div>
       </main>
     );

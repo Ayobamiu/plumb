@@ -153,13 +153,6 @@ export function HomeClient({ projects, feed, since, error, realtimeReady, onRefr
           Could not read Supabase: {error}
         </div>
       ) : null}
-      {!realtimeReady && !error ? (
-        <div className="banner">
-          Polling every 15s. For push updates, add NEXT_PUBLIC_SUPABASE_ANON_KEY and a
-          read policy on transitions.
-        </div>
-      ) : null}
-
       <section>
         <h2>Changed since you last looked</h2>
         <p className="meta">Transitions to OUT or REVIEW since {new Date(since).toLocaleString()}.</p>

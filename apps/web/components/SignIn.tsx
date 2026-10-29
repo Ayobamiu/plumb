@@ -15,7 +15,7 @@ export function SignIn({ prompt }: { prompt: string }) {
     const supabase = getBrowserSupabase();
     if (!supabase) {
       setState("error");
-      setMessage("Sign-in isn't set up on this site yet (NEXT_PUBLIC_SUPABASE_ANON_KEY).");
+      setMessage("Sign-in isn't set up on this site yet. Please try again later.");
       return;
     }
     const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.href } });

@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "/ingest is not live yet (Claude Code owns extraction). Notes are not stored.",
+          "Saving notes isn't available right now. Nothing was stored.",
       },
       { status: 501 },
     );
