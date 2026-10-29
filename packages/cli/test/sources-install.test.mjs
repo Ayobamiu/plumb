@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const tmp = mkdtempSync(join(tmpdir(), "plumb-cli-test-"));
+const tmp = mkdtempSync(join(tmpdir(), "plumb-ai-test-"));
 process.env.HOME = tmp; // os.homedir() follows HOME
 process.env.PLUMB_HOME = join(tmp, ".plumb");
 

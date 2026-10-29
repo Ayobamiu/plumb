@@ -30,7 +30,7 @@ const PARALLEL = 3;
 function need() {
   const c = loadConfig();
   if (!c?.token) {
-    console.error("Not signed in. Run: npx plumb-cli init");
+    console.error("Not signed in. Run: npx plumb-ai init");
     process.exit(1);
   }
   return c;
@@ -95,7 +95,7 @@ async function init() {
   if (!flag("--no-backfill")) await backfill();
   console.log("Claude chats (claude.ai and the desktop app) live on Anthropic's servers. To bring them in:");
   console.log("  1. claude.ai > Settings > Privacy > Export data. You get an email with a link.");
-  console.log("  2. Download the zip while signed in, then run: npx plumb-cli import <the zip>\n");
+  console.log("  2. Download the zip while signed in, then run: npx plumb-ai import <the zip>\n");
 }
 
 // ---- sending ----
@@ -156,7 +156,7 @@ async function backfill() {
   if (!all.length) return;
   console.log("\nPlumb keeps a title and a short summary of each, and marks personal ones. Secrets are stripped first. Sessions already saved are skipped.");
   if (flag("--dry-run") || !(await ask(`Bring in ${all.length} sessions now?`))) {
-    console.log("Nothing sent. Run `npx plumb-cli backfill` when you're ready.\n");
+    console.log("Nothing sent. Run `npx plumb-ai backfill` when you're ready.\n");
     return;
   }
   await send(config, all);
