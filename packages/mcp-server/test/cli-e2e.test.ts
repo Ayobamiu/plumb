@@ -3,7 +3,7 @@
 // folder, brings in fake past sessions (secrets stripped), and the user finds
 // one by description. Nothing here touches the real home folder or network.
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -18,7 +18,10 @@ const seen: string[] = [];
 const model: JsonModel = {
   async json(opts) {
     seen.push(opts.user);
-    if (opts.schemaName === "index") return opts.parse.parse({ title: opts.user.includes("gym") ? "Gym week plan" : "Auth refactor", summary: opts.user.includes("gym") ? "A push pull legs week." : "Tokens per tool.", personal: opts.user.includes("gym") }) as never;
+    if (opts.schemaName === "claims") {
+      const gym = opts.user.includes("gym");
+      return opts.parse.parse({ claims: [], contradicts: [], mentions: [], title: gym ? "Gym week plan" : "Auth refactor", summary: gym ? "A push pull legs week." : "Tokens per tool.", personal: gym }) as never;
+    }
     if (opts.schemaName === "search") {
       const id = /\[([^\]]+)\][^\n]*\n  title: Gym week plan/.exec(opts.user)![1];
       return opts.parse.parse({ best: id, alternatives: [], why: "It's the gym plan." }) as never;
@@ -52,8 +55,10 @@ describe("npx plumb-ai init, end to end", () => {
     const proj = join(home, ".claude", "projects", "-repo");
     mkdirSync(proj, { recursive: true });
     mkdirSync(join(home, ".cursor"), { recursive: true });
-    writeFileSync(join(proj, "s-gym.jsonl"), JSON.stringify({ timestamp: "2026-10-20T10:00:00Z", message: { role: "user", content: "Plan my gym week. My key is META_MODEL_API_KEY=abcdef123456789" } }) + "\n");
-    writeFileSync(join(proj, "s-auth.jsonl"), JSON.stringify({ timestamp: "2026-10-21T10:00:00Z", message: { role: "user", content: "Refactor auth to one token per tool" } }) + "\n");
+    mkdirSync(join(home, "repo", ".git"), { recursive: true });
+    const cwd = join(home, "repo", "src"); // a subfolder: the session lands in the repo's project
+    writeFileSync(join(proj, "s-gym.jsonl"), JSON.stringify({ cwd, timestamp: "2026-10-20T10:00:00Z", message: { role: "user", content: "Plan my gym week. My key is META_MODEL_API_KEY=abcdef123456789" } }) + "\n");
+    writeFileSync(join(proj, "s-auth.jsonl"), JSON.stringify({ cwd, timestamp: "2026-10-21T10:00:00Z", message: { role: "user", content: "Refactor auth to one token per tool" } }) + "\n");
     const env = { HOME: home, PLUMB_HOME: join(home, ".plumb"), PLUMB_CURSOR_DB: join(home, "none.vscdb"), PATH: "/usr/bin:/bin" };
 
     try {
@@ -70,9 +75,10 @@ describe("npx plumb-ai init, end to end", () => {
       expect(init.out).toContain("Claude Code: hooks in ~/.claude/settings.json");
       expect(init.out).toContain("saved 2");
 
-      // Saved for the new user only, as index mode, with the secret gone before it left.
+      // Saved for the new user only, in full mode, in the project for the folder, with the secret gone before it left.
       const mine = store.sources.filter((s) => s.user_id === "user-new");
       expect(mine.map((s) => [s.external_id, s.title, s.label]).sort()).toEqual([["s-auth", "Auth refactor", undefined], ["s-gym", "Gym week plan", "personal"]]);
+      expect(store.projects.filter((p) => p.user_id === "user-new").map((p) => [p.name, p.workspace]).sort()).toEqual([["My work", undefined], ["repo", join(home, "repo")]]);
       expect(seen.join("\n")).not.toContain("abcdef123456789");
       expect(seen.join("\n")).toContain("META_MODEL_API_KEY=[REDACTED]");
       const config = JSON.parse(readFileSync(join(home, ".plumb", "config.json"), "utf8"));
@@ -81,6 +87,15 @@ describe("npx plumb-ai init, end to end", () => {
       // Running it again sends nothing new.
       const again = await run(["backfill", "--yes"], env);
       expect(again.out).toContain("saved 0, unchanged or empty 2");
+
+      // A session that grew sends only its new turns, marked as a continuation.
+      appendFileSync(join(proj, "s-auth.jsonl"), JSON.stringify({ cwd, timestamp: "2026-10-22T10:00:00Z", message: { role: "assistant", content: "Done: the login page now uses per-tool tokens." } }) + "\n");
+      const grew = await run(["backfill", "--yes"], env);
+      expect(grew.out).toContain("saved 1, unchanged or empty 1");
+      const last = seen.at(-1)!;
+      expect(last).toContain("This continues a session already saved");
+      expect(last).toContain("Done: the login page now uses per-tool tokens.");
+      expect(last).not.toContain("Refactor auth to one token per tool");
 
       // And the user finds it by description, through the same token.
       const found = await (await fetch(`${api}/tools/find_context`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.token}` }, body: JSON.stringify({ query: "my gym plan from last week" }) })).json();

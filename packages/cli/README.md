@@ -23,7 +23,7 @@ Other commands:
 ## What leaves your computer
 
 - Secrets are stripped first (API keys, tokens, passwords, private keys).
-- Plumb keeps a title, a short summary and whether a session is personal or work, never the transcript.
+- Plumb reads each session to write down what it decided and planned, a title, a short summary and whether it's personal or work. It never stores the transcript itself.
 - Your settings files are merged, never replaced, and backed up once as `*.plumb-backup`.
 - Your token is in `~/.plumb/config.json`, readable only by you.
 

@@ -32,12 +32,20 @@ export function excerpt(text) {
   return `${text.slice(0, HEAD_CHARS)}\n\n[... ${text.length - HEAD_CHARS - TAIL_CHARS} characters left out ...]\n\n${text.slice(-TAIL_CHARS)}`;
 }
 
-/** Save one session in index mode: a title, a summary and personal or work. */
-export function indexSession(config, { kind, external_id, title, text, at }) {
+const FULL_CHARS = 180_000; // full mode reads the most recent 200k characters at most
+
+/**
+ * Save one session. Full mode (the default, Oct 29): Plumb writes down what the
+ * session decided and planned, so it can tell later what stopped being true.
+ * Index mode: only a title, a summary and personal or work. The workspace (the
+ * folder it ran in, or "chats") picks the project.
+ */
+export function saveSession(config, { kind, external_id, title, text, at, workspace, index }) {
   const body = {
-    index_only: true,
+    ...(index && { index_only: true }),
+    ...(workspace && { workspace }),
     source: { kind, external_id: String(external_id).slice(0, 200), ...(title && { title: title.slice(0, 200) }) },
-    text: excerpt(text),
+    text: index ? excerpt(text) : text.length > FULL_CHARS ? text.slice(-FULL_CHARS) : text,
     ...(at && { at }),
   };
   return post(config.api, "/ingest", body, config.token);

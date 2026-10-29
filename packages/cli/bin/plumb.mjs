@@ -4,8 +4,9 @@
 //   plumb backfill          bring in past Claude Code and Cursor sessions (asks first)
 //   plumb import <zip>      bring in Claude chats from a claude.ai data export
 //   plumb status            when Plumb last saved each tool
-// Every text is stripped of secrets before it leaves this machine, and sent in
-// index mode: Plumb keeps a title and a short summary, never the transcript.
+// Every text is stripped of secrets before it leaves this machine. Plumb reads
+// it to write down what the session decided and planned (claims with reasons),
+// a title and a summary; it never stores the transcript itself.
 // Node's built-in SQLite (used read-only for Cursor's history) prints an
 // "experimental" warning on first use; it's noise for someone running a CLI.
 const emitWarning = process.emitWarning.bind(process);
@@ -17,7 +18,7 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { indexSession, post, PlumbError } from "../lib/api.mjs";
+import { post, PlumbError, saveSession } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
 import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, refreshApp } from "../lib/install.mjs";
 import { scrub } from "../lib/scrub.mjs";
@@ -105,41 +106,63 @@ async function init() {
 
 // ---- sending ----
 
-async function send(config, sessions) {
+const CONTINUES = "(This continues a session already saved; earlier turns are not shown.)";
+
+/**
+ * Save what's new in one session. Full mode sends only the turns added since
+ * the last full save, so a long session isn't extracted again every time.
+ * Returns false when there was nothing new to send.
+ */
+async function saveOne(config, state, s, read, { index = false } = {}) {
+  const k = key(s);
+  const prev = state.sent[k];
+  const all = scrub(read.text);
+  const h = hash(all);
+  if (!read.turns) return false;
+  const sameMode = index ? prev?.mode !== "full" : prev?.mode === "full";
+  if (sameMode && prev?.hash === h) return false;
+  let text = all;
+  if (!index) {
+    const done = prev?.mode === "full" ? Math.min(prev.turns ?? 0, read.turns) : 0;
+    const fresh = read.list.slice(done);
+    if (!fresh.length) return false;
+    text = (done ? `${CONTINUES}\n\n` : "") + scrub(fresh.join("\n\n"));
+  }
+  await saveSession(config, { kind: s.kind, external_id: s.external_id, title: s.title, text, at: read.last_at ?? s.modified_at, workspace: read.workspace ?? s.workspace, index });
+  state.sent[k] = { hash: h, at: new Date().toISOString(), turns: read.turns, mode: index ? "index" : "full" };
+  return true;
+}
+
+async function send(config, sessions, opts = {}) {
   const state = loadState();
   let sent = 0;
   let skipped = 0;
   let failed = 0;
   let stop;
   const queue = [...sessions];
+  const progress = () => !opts.quiet && process.stdout.write(`\r  saved ${sent}, unchanged ${skipped}, failed ${failed}`);
   async function worker() {
     while (queue.length && !stop) {
       const s = queue.shift();
-      const read = s.read();
-      const text = scrub(read.text);
-      const h = hash(text);
-      if (!read.turns || state.sent[key(s)]?.hash === h) {
-        skipped++;
-        continue;
-      }
       try {
-        await indexSession(config, { kind: s.kind, external_id: s.external_id, title: s.title, text, at: read.last_at ?? s.modified_at });
-        state.sent[key(s)] = { hash: h, at: new Date().toISOString() };
-        sent++;
-        if (sent % 5 === 0) saveState(state);
-        process.stdout.write(`\r  saved ${sent}, unchanged ${skipped}, failed ${failed}`);
+        if (await saveOne(config, state, s, s.read(), opts)) {
+          sent++;
+          if (sent % 5 === 0) saveState(state);
+        } else skipped++;
+        progress();
       } catch (err) {
         failed++;
         if (err.status === 401) stop = "Your token isn't valid any more. Run plumb init again.";
         else if (err.status === 503) stop = "Plumb's model is busy right now. Run the same command later; it picks up where it stopped.";
-        else console.error(`\n  ${s.tool} ${s.external_id}: ${err.message}`);
+        else if (!opts.quiet) console.error(`\n  ${s.tool} ${s.external_id}: ${err.message}`);
       }
     }
   }
   await Promise.all(Array.from({ length: PARALLEL }, worker));
   saveState(state);
-  console.log(`\r  saved ${sent}, unchanged or empty ${skipped}, failed ${failed}`);
-  if (stop) console.log(`  ${stop}`);
+  if (!opts.quiet) console.log(`\r  saved ${sent}, unchanged or empty ${skipped}, failed ${failed}`);
+  if (stop && !opts.quiet) console.log(`  ${stop}`);
+  return { sent, skipped, failed, stop };
 }
 
 function summarize(groups) {
@@ -159,12 +182,12 @@ async function backfill() {
   console.log("Past sessions on this computer:");
   summarize(groups);
   if (!all.length) return;
-  console.log("\nPlumb keeps a title and a short summary of each, and marks personal ones. Secrets are stripped first. Sessions already saved are skipped.");
+  console.log("\nPlumb writes down what each session decided and planned, so it can tell you later what stopped being true. Personal ones are marked, secrets are stripped first, and sessions already saved are skipped.");
   if (flag("--dry-run") || !(await ask(`Bring in ${all.length} sessions now?`))) {
     console.log(`Nothing sent. Run \`npx plumb-ai backfill\` when you're ready${process.stdin.isTTY ? "" : " (add --yes to skip the question)"}.\n`);
     return;
   }
-  await send(config, all);
+  await send(config, all, { index: flag("--index") });
   console.log();
 }
 
@@ -179,7 +202,7 @@ async function importExport() {
   console.log("In this export:");
   summarize([["Claude chat", chats]]);
   if (!chats.length || flag("--dry-run") || !(await ask(`Bring in ${chats.length} chats now?`))) return;
-  await send(config, chats);
+  await send(config, chats, { index: flag("--index") });
 }
 
 async function status() {
@@ -232,15 +255,12 @@ async function hookSend() {
     session = (await listCursorChats()).find((c) => c.external_id === id);
   } else {
     const path = transcript && existsSync(transcript) ? transcript : listClaudeCodeSessions().find((s) => s.external_id === id)?.path;
-    if (path) session = { kind, external_id: id, read: () => readClaudeCodeTranscript(path) };
+    if (path) session = { tool: "Claude Code", kind, external_id: id, read: () => readClaudeCodeTranscript(path) };
   }
   if (!session) return hookLog(`${tool} ${id}: session not found`);
-  const read = session.read();
-  const text = scrub(read.text);
-  if (!read.turns || last?.hash === hash(text)) return;
   try {
-    await indexSession(config, { kind, external_id: id, title: session.title, text, at: read.last_at });
-    state.sent[`${kind}:${id}`] = { hash: hash(text), at: new Date().toISOString() };
+    const saved = await saveOne(config, state, session, session.read());
+    if (!saved) return;
     saveState(state);
     hookLog(`${tool} ${id}: saved`);
   } catch (err) {

@@ -51,7 +51,8 @@ export function readExport(path) {
           external_id: c.uuid || c.id,
           title: typeof c.name === "string" && c.name.trim() ? c.name.trim() : undefined,
           modified_at: c.updated_at || c.created_at,
-          read: () => ({ text: turns.join("\n\n"), turns: turns.length, last_at: c.updated_at || c.created_at }),
+          workspace: "chats",
+          read: () => ({ text: turns.join("\n\n"), list: turns, turns: turns.length, last_at: c.updated_at || c.created_at }),
         };
       })
       .filter((c) => c.external_id);

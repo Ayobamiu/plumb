@@ -2,7 +2,16 @@
 // (Claude desktop's Code tab writes there too). The session id is what the hooks send.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
+
+/** The repo a folder is in (nearest parent with .git), or the folder itself. */
+export function repoRoot(folder) {
+  if (!folder) return undefined;
+  for (let dir = folder; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    if (dirname(dir) === dir) return folder;
+  }
+}
 
 const root = () => process.env.PLUMB_CLAUDE_DIR || join(homedir(), ".claude", "projects");
 
@@ -41,7 +50,7 @@ export function readClaudeCodeTranscript(path) {
     if (!text || (role !== "user" && role !== "assistant")) continue;
     turns.push(`${role === "user" ? "User" : "Claude Code"}:\n${text}`);
   }
-  return { text: turns.join("\n\n"), turns: turns.length, cwd, first_at: first, last_at: last };
+  return { text: turns.join("\n\n"), list: turns, turns: turns.length, cwd, workspace: repoRoot(cwd) ?? "chats", first_at: first, last_at: last };
 }
 
 export function listClaudeCodeSessions() {
