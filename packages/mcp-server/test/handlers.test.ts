@@ -136,6 +136,10 @@ describe("get_project_state and explain_claim", () => {
     expect(state.markdown).toMatch(/^# Project state: Meta hackathon\n/);
     expect(state.markdown).toContain("  - OUT: Follow up with Avery Friday. Went OUT because");
     expect(state.markdown).toContain("## Facts\n\n- Demo is Nov 4");
+    // Coverage counts every project; the session above just saved.
+    expect(state.coverage.find((r: any) => r.kind === session.kind)).toMatchObject({ stale: false });
+    expect(state.coverage.find((r: any) => r.kind === session.kind).last_saved_at).toBeDefined();
+    expect(state.markdown).toContain("## Saving from your tools (all projects)");
   });
 
   it("explains a claim: reasons, both directions of the chain, history", async () => {

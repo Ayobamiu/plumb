@@ -5,6 +5,7 @@
 import type { z } from "zod";
 import type { ClaimKind } from "../contract.js";
 import type { GetProjectStateOutput } from "../tools.js";
+import { renderCoverage } from "./coverage.js";
 import { formatTime } from "./explain.js";
 
 type State = Omit<z.infer<typeof GetProjectStateOutput>, "markdown" | "summary">;
@@ -70,5 +71,6 @@ export function renderProjectState(state: State, opts: { since: string; now: str
   if (quiet > 0) {
     lines.push("", `${quiet} quiet ${quiet === 1 ? "claim is" : "claims are"} not shown: nobody has mentioned ${quiet === 1 ? "it" : "them"} lately. ${quiet === 1 ? "It is" : "They are"} still kept.`);
   }
+  if (state.coverage?.length) lines.push("", ...renderCoverage(state.coverage, opts.now));
   return lines.join("\n") + "\n";
 }

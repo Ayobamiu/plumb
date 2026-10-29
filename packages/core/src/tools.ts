@@ -34,6 +34,17 @@ export const GetProjectStateInput = z.object({
   quiet_after_days: z.number().int().min(1).max(365).optional(),
 });
 export const ChangedClaim = z.object({ claim: Claim, transition: Transition });
+// Coverage (added Oct 28, Usman OK'd): per tool, when Plumb last saved
+// something from it, across all projects. stale: it has saved before, but not
+// lately (2 days for session tools and email; docs and notes never go stale).
+export const ToolCoverage = z.object({
+  kind: SourceKind,
+  tool: z.string(), // "Claude Code", "Cursor", ...
+  last_saved_at: Timestamp.optional(), // none if nothing was saved in the last 90 days
+  sources_7d: z.number().int(), // sessions, threads or docs saved in the last 7 days
+  stale: z.boolean(),
+});
+export type ToolCoverage = z.infer<typeof ToolCoverage>;
 export const GetProjectStateOutput = z.object({
   project: Project,
   in_claims: z.record(ClaimKind, z.array(Claim)),
@@ -41,6 +52,7 @@ export const GetProjectStateOutput = z.object({
   summary: z.string().optional(), // optional Muse Spark handoff summary
   markdown: z.string().optional(), // the same state as PROJECT_STATE.md text (tab 1, generated state file)
   quiet_claims: z.array(Claim).optional(), // still IN, just not shown by default (added Oct 27)
+  coverage: z.array(ToolCoverage).optional(), // per tool, across all projects (added Oct 28)
 });
 
 // record_claims

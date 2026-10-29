@@ -5,7 +5,10 @@ import { randomUUID } from "node:crypto";
 import type { z } from "zod";
 import {
   ClaimKind,
+  computeCoverage,
   confirmOut,
+  COVERAGE_DAYS,
+  EventKind,
   evaluateClaims,
   explainEdited,
   isQuiet,
@@ -24,6 +27,7 @@ import {
   type ClaimStatus,
   type Event,
   type JsonModel,
+  type ToolCoverage,
   type ExplainClaimInput,
   type FindContextInput,
   type GetContextInput,
@@ -150,9 +154,26 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
     });
   }
 
+  /** Not an MCP tool: per tool, when Plumb last saved something from it (all projects). */
+  async function toolCoverage(now: string): Promise<ToolCoverage[]> {
+    const after = new Date(Date.parse(now) - COVERAGE_DAYS * DAY_MS).toISOString();
+    const [events, claims] = await Promise.all([
+      store.loadEvents({ kinds: EventKind.options.filter((k) => k !== "clock"), observed_after: after }),
+      store.loadClaims({ recorded_after: after }),
+    ]);
+    const saves = [
+      ...events.map((e) => ({ source_id: e.source_id, at: e.observed_at })),
+      ...claims.map((c) => ({ source_id: c.source_id, at: c.recorded_at })),
+    ];
+    const sources = await store.loadSources([...new Set(saves.map((s) => s.source_id))]);
+    const kindOf = new Map(sources.filter((src) => src.external_id !== "clock" && !src.external_id.startsWith("smoke-")).map((src) => [src.id, src.kind]));
+    return computeCoverage(saves.flatMap((s) => (kindOf.has(s.source_id) ? [{ ...s, kind: kindOf.get(s.source_id)! }] : [])), now);
+  }
+
   return {
     review,
     mention,
+    toolCoverage,
 
     // "@ a session from any tool" (added Oct 27).
     async find_context(input: z.infer<typeof FindContextInput>) {
@@ -191,8 +212,9 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
         .reverse() // newest first
         .map((transition) => ({ claim: byId.get(transition.claim_id)!, transition }));
 
-      const markdown = renderProjectState({ project, in_claims, changed_since, quiet_claims }, { since, now });
-      return { project, in_claims, changed_since, markdown, quiet_claims };
+      const coverage = await toolCoverage(now);
+      const markdown = renderProjectState({ project, in_claims, changed_since, quiet_claims, coverage }, { since, now });
+      return { project, in_claims, changed_since, markdown, quiet_claims, coverage };
     },
 
     async record_claims(input: z.infer<typeof RecordClaimsInput>): Promise<z.infer<typeof RecordClaimsOutput>> {
