@@ -9,6 +9,7 @@ import {
   ListLinkSuggestionsInput,
   MetaClient,
   ResolveLinkSuggestionInput,
+  type JsonModel,
 } from "@plumb/core";
 import type { Express, Request, Response } from "express";
 import { loadTokens, requireBearer, type TokenMap } from "./auth.js";
@@ -34,6 +35,7 @@ export interface HttpOptions {
   ownerUserId?: string; // env tokens belong to this user (PLUMB_OWNER_USER_ID)
   webUrl?: string; // the homepage, for device sign-in (PLUMB_WEB_URL)
   verifySession?: (accessToken: string) => Promise<string | undefined>;
+  model?: JsonModel; // tests; the real server uses Muse Spark (META_MODEL_API_KEY)
   /** Host for DNS-rebinding checks; use 0.0.0.0 in deploy. */
   host?: string;
 }
@@ -91,7 +93,7 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
       return;
     }
     try {
-      const result = await callTool(scoped(req), name, req.body);
+      const result = await callTool(scoped(req), name, req.body, opts.model ? { model: opts.model } : {});
       res.json(result);
     } catch (err) {
       sendToolError(res, err);
@@ -105,7 +107,7 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
       return;
     }
     try {
-      const result = await ingest(scoped(req), new MetaClient(), parsed.data);
+      const result = await ingest(scoped(req), opts.model ?? new MetaClient(), parsed.data);
       res.json(result);
     } catch (err) {
       sendToolError(res, err);

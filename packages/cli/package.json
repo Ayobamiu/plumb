@@ -1,0 +1,12 @@
+{
+  "name": "plumb-cli",
+  "version": "0.1.0",
+  "description": "Connect Claude Code and Cursor to Plumb, and bring in your past chats.",
+  "type": "module",
+  "bin": { "plumb": "bin/plumb.mjs" },
+  "files": ["bin", "lib", "assets"],
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "test": "node --test --no-warnings test/*.test.mjs"
+  }
+}
