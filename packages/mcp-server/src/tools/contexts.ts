@@ -10,6 +10,7 @@ import {
   matchesQuery,
   parseContextUri,
   renderContext,
+  searchByDescription,
   toolLabel,
   type Claim,
   type ContextEntry,
@@ -17,6 +18,8 @@ import {
   type FindContextInput,
   type GetContextInput,
   type GetContextOutput,
+  type JsonModel,
+  type SearchCandidate,
   type Source,
   type Transition,
 } from "@plumb/core";
@@ -25,6 +28,7 @@ import type { Store } from "./store.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_DAYS = 14;
+const SEARCH_DAYS = 90; // search by description looks further back than the @ list
 const RESOLVE_DAYS = 90; // an @ link stays readable a while after it drops off the list
 const NEWS_KINDS = EventKind.options.filter((k) => k !== "clock");
 const MAX_CHANGED = 10;
@@ -175,12 +179,34 @@ export async function readContext(store: Store, input: z.infer<typeof GetContext
   };
 }
 
-export async function findContext(store: Store, input: z.infer<typeof FindContextInput>) {
-  return {
-    contexts: await listContexts(store, {
-      query: input.query,
-      ...(input.project_id && { project_id: input.project_id }),
-      ...(input.limit && { limit: input.limit }),
-    }),
-  };
+// find_context. With a model (Oct 28), the query is a description in the
+// user's own words: Muse Spark picks the session they mean from recent ones,
+// and contexts come back best first, then up to 3 alternatives; empty when
+// nothing fits. Without a model, or if the call fails, every query word must
+// match (matchesQuery), newest first.
+export async function findContext(store: Store, input: z.infer<typeof FindContextInput>, model?: JsonModel) {
+  const scope = { ...(input.project_id && { project_id: input.project_id }) };
+  if (model) {
+    const all = await listContexts(store, { ...scope, days: SEARCH_DAYS, limit: 1000 });
+    const claims = all.length ? await store.loadClaims({ source_ids: all.map((e) => e.source_id) }) : [];
+    const said = new Map<string, Claim[]>();
+    for (const c of claims) said.set(c.source_id, [...(said.get(c.source_id) ?? []), c]);
+    const candidates: SearchCandidate[] = all.map((e) => ({
+      id: e.source_id,
+      tool: e.tool,
+      last_at: e.last_at,
+      ...(e.title && { title: e.title }),
+      summary: e.description,
+      claims: (said.get(e.source_id) ?? []).sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at)).map((c) => c.text),
+    }));
+    try {
+      const found = await searchByDescription(model, input.query, candidates, new Date().toISOString());
+      const byId = new Map(all.map((e) => [e.source_id, e]));
+      const picked = found.best ? [found.best, ...found.alternatives] : [];
+      return { contexts: picked.map((m) => byId.get(m.id)!).slice(0, input.limit ?? 30) };
+    } catch {
+      // fall through to keyword matching: a failed model call shouldn't leave the user with nothing
+    }
+  }
+  return { contexts: await listContexts(store, { ...scope, query: input.query, ...(input.limit && { limit: input.limit }) }) };
 }

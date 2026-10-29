@@ -156,7 +156,7 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
 
     // "@ a session from any tool" (added Oct 27).
     async find_context(input: z.infer<typeof FindContextInput>) {
-      return findContext(store, input);
+      return findContext(store, input, opts.model);
     },
 
     async get_context(input: z.infer<typeof GetContextInput>) {

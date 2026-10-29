@@ -83,3 +83,39 @@ describe("contexts: email threads", () => {
     expect(titles).toEqual(["Contract: looping in legal"]);
   });
 });
+
+describe("contexts: search by description", () => {
+  const ranker = (pick: (user: string) => { best: string | null; alternatives: { id: string; why: string }[] }, seen: string[] = []): JsonModel => ({
+    async json(opts) {
+      if (opts.schemaName !== "search") throw new Error("unexpected call");
+      seen.push(opts.user);
+      return opts.parse.parse({ ...pick(opts.user), why: "fits" }) as never;
+    },
+  });
+  const idOf = (user: string, title: string) => new RegExp(`\\[([^\\]]+)\\][^\\n]*\\n  title: ${title}`).exec(user)![1]!;
+
+  it("returns the model's best match first, then alternatives, from the user's words as typed", async () => {
+    const { store } = await setup();
+    const seen: string[] = [];
+    const model = ranker((u) => ({ best: idOf(u, "Login page wiring"), alternatives: [{ id: idOf(u, "Auth refactor: middleware done"), why: "same feature" }] }), seen);
+    const found: any = await callTool(store, "find_context", { query: "the login work from cursor yesterday" }, { model });
+    expect(found.contexts.map((c: any) => c.title)).toEqual(["Login page wiring", "Auth refactor: middleware done"]);
+    expect(seen[0]).toContain("Request: the login work from cursor yesterday");
+    expect(seen[0]).toContain("said: Login page ships Friday");
+  });
+
+  it("returns nothing when the model finds no match, and drops ids it made up", async () => {
+    const { store } = await setup();
+    const none: any = await callTool(store, "find_context", { query: "my tax return" }, { model: ranker(() => ({ best: null, alternatives: [] })) });
+    expect(none.contexts).toEqual([]);
+    const madeUp: any = await callTool(store, "find_context", { query: "x" }, { model: ranker(() => ({ best: "not-a-real-id", alternatives: [] })) });
+    expect(madeUp.contexts).toEqual([]);
+  });
+
+  it("falls back to keyword matching when the model call fails", async () => {
+    const { store } = await setup();
+    const failing: JsonModel = { json: async () => { throw new Error("Meta API 503"); } };
+    const found: any = await callTool(store, "find_context", { query: "cursor login" }, { model: failing });
+    expect(found.contexts.map((c: any) => c.title)).toEqual(["Login page wiring"]);
+  });
+});

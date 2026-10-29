@@ -6,7 +6,9 @@
   "scripts": {
     "eval": "tsx src/run.ts",
     "eval:model": "META_COST_LOG=../logs/meta-calls.jsonl tsx --env-file=../.env src/run.ts --model",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "eval:search": "tsx src/search.ts",
+    "eval:search:model": "META_COST_LOG=../logs/meta-calls.jsonl tsx --env-file=../.env src/search.ts --model"
   },
   "dependencies": {
     "@plumb/core": "workspace:*",

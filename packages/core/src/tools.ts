@@ -179,7 +179,7 @@ export const ContextEntry = z.object({
 export type ContextEntry = z.infer<typeof ContextEntry>;
 
 export const FindContextInput = z.object({
-  query: z.string().min(1), // e.g. "cursor auth refactor"; every word must match the tool, title or summary
+  query: z.string().min(1), // the user's own words, e.g. "gym plan from Claude last week"; without a model, every word must match the tool, title or summary
   project_id: z.string().optional(),
   limit: z.number().int().min(1).max(50).optional(),
 });

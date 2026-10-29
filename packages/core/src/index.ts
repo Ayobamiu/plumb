@@ -10,3 +10,4 @@ export * from "./brain/sweep.js";
 export * from "./brain/state-file.js";
 export * from "./brain/quiet.js";
 export * from "./brain/context.js";
+export * from "./brain/search.js";

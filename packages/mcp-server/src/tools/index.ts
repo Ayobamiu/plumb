@@ -4,7 +4,7 @@
 // Transport code only needs callTool:
 //   const store = SupabaseStore.fromEnv();
 //   const result = await callTool(store, "record_event", body);
-// It throws ToolError with code "bad_input" (HTTP 400) or "not_found" (404).
+// It throws ToolError: bad_input → 400, not_found → 404, unavailable → 503.
 //
 // POST /ingest is not an MCP tool; it needs a model client too:
 //   const body = IngestInput.parse(json); // from @plumb/core, 400 on failure
@@ -48,7 +48,7 @@ export const toolDescriptions: Record<ToolName, string> = {
   explain_claim: "The reason chain and full status history for one claim.",
   resolve_review: "Usman's decision on a claim: confirm_out, restore_in, or edit its text.",
   find_context:
-    "Find a recent session, chat, doc or email thread from any of Usman's tools (Claude Code, Cursor, Claude chat, docs, Gmail) by tool and title words, e.g. 'cursor auth refactor'. Use when Usman refers to work done in another tool. Then call get_context with the uri.",
+    "Find a session, chat, doc or email thread from the user's other tools (Claude Code, Cursor, Claude chat, docs, Gmail) from a description in their own words, e.g. 'gym plan from Claude last week'. Pass their words as typed, not keywords. Returns the best match first, then up to 3 alternatives; empty if nothing fits. Then call get_context with the uri.",
   get_context:
     "Get what a session from another tool said, and what of it is still true now: what happened, what it decided and planned (still true / no longer true and why / waiting for review), and what changed since. Pass the uri from find_context or an @ mention.",
 };
