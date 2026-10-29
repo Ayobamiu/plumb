@@ -6,13 +6,14 @@ export class PlumbError extends Error {
   }
 }
 
-export async function post(api, path, body, token) {
+export async function post(api, path, body, token, timeoutMs) {
   let res;
   try {
     res = await fetch(`${api.replace(/\/$/, "")}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(token && { authorization: `Bearer ${token}` }) },
       body: JSON.stringify(body ?? {}),
+      ...(timeoutMs && { signal: AbortSignal.timeout(timeoutMs) }),
     });
   } catch (err) {
     throw new PlumbError(`can't reach Plumb at ${api} (${err.message})`, 0);

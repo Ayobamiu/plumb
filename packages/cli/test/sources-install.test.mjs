@@ -96,3 +96,17 @@ test("the hourly sync job is written to run plumb sync from the stable copy", as
     assert.match(plist, /\.plumb\/app\/bin\/plumb\.mjs<\/string><string>sync<\/string>/);
   } else assert.match(out[0], /crontab/);
 });
+
+test("the session-start note: at most 5 plain lines, nothing when nothing changed; hooks registered", async () => {
+  const { changeNote } = await import("../lib/note.mjs");
+  assert.equal(changeNote([]), "");
+  const row = (text, to, why) => ({ claim: { text }, transition: { to_status: to, explanation: why } });
+  const note = changeNote([row("Deploy Friday", "OUT", "Went OUT because CI failed."), row("No reply from Priya", "REVIEW", "Priya may have replied."), ...Array(5).fill(row("x", "OUT", "y"))]);
+  assert.match(note, /^Plumb: since your last session in this folder, these changed:\n- No longer true: Deploy Friday\. Went OUT because CI failed\.\n- May be out of date: No reply from Priya\. Priya may have replied\./);
+  assert.equal(note.split("\n").filter((l) => l.startsWith("- ")).length, 5);
+  assert.match(note, /\(2 more: ask with \/plumb\)$/);
+  const s = JSON.parse(readFileSync(join(tmp, ".claude", "settings.json"), "utf8"));
+  assert.match(s.hooks.SessionStart[0].hooks[0].command, /plumb\.mjs" hook-start claude-code$/);
+  const h = JSON.parse(readFileSync(join(tmp, ".cursor", "hooks.json"), "utf8"));
+  assert.match(h.hooks.sessionStart[0].command, /hook-start cursor$/);
+});

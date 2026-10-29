@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import type { JsonModel } from "@plumb/core";
 import { createHttpApp } from "../src/http.js";
 import { MEMORY_USER, MemoryStore } from "../src/tools/memory-store.js";
+import { callTool, ScopedStore } from "../src/tools/index.js";
 
 const CLI = resolve(__dirname, "../../cli/bin/plumb.mjs");
 const seen: string[] = [];
@@ -30,9 +31,10 @@ const model: JsonModel = {
   },
 };
 
-function run(args: string[], env: NodeJS.ProcessEnv, onOut?: (s: string) => void): Promise<{ code: number; out: string }> {
+function run(args: string[], env: NodeJS.ProcessEnv, onOut?: (s: string) => void, stdin?: string): Promise<{ code: number; out: string }> {
   return new Promise((done) => {
     const child = spawn(process.execPath, ["--no-warnings", CLI, ...args], { env: { ...process.env, ...env } });
+    child.stdin.end(stdin ?? "");
     let out = "";
     child.stdout.on("data", (d) => {
       out += d;
@@ -96,6 +98,19 @@ describe("npx plumb-ai init, end to end", () => {
       expect(last).toContain("This continues a session already saved");
       expect(last).toContain("Done: the login page now uses per-tool tokens.");
       expect(last).not.toContain("Refactor auth to one token per tool");
+
+      // Session start in that repo: nothing changed yet, so no note.
+      const start = (dir: string) => run(["hook-start", "claude-code"], env, undefined, JSON.stringify({ cwd: dir }));
+      expect((await start(cwd)).out.trim()).toBe("");
+      // A claim in the repo goes OUT; the next session start there says so, in Claude Code's format.
+      const scoped = new ScopedStore(store, "user-new");
+      const repoProject = store.projects.find((p) => p.user_id === "user-new" && p.workspace === join(home, "repo"))!;
+      const rec: any = await callTool(scoped, "record_claims", { project_id: repoProject.id, source: { kind: "claude_code", external_id: "s-auth" }, extracted_by: "t", claims: [{ text: "Deploy the login page Friday", kind: "next_step", valid_from: "2026-10-21T00:00:00Z", reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] }] }, { model: null });
+      await callTool(scoped, "resolve_review", { claim_id: rec.claims[0].id, action: "confirm_out" }, { model: null });
+      const note = JSON.parse((await start(cwd)).out);
+      expect(note.hookSpecificOutput.hookEventName).toBe("SessionStart");
+      expect(note.hookSpecificOutput.additionalContext).toContain("- No longer true: Deploy the login page Friday. Went OUT because you confirmed it is no longer true.");
+      expect((await start(cwd)).out.trim()).toBe(""); // shown once, then quiet
 
       // And the user finds it by description, through the same token.
       const found = await (await fetch(`${api}/tools/find_context`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.token}` }, body: JSON.stringify({ query: "my gym plan from last week" }) })).json();

@@ -11,8 +11,8 @@ import { home } from "./config.mjs";
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const appDir = () => join(home(), "app");
-export const hookCommand = (tool) => `node "${join(appDir(), "bin", "plumb.mjs")}" hook ${tool}`;
-const isOurs = (cmd) => typeof cmd === "string" && cmd.includes("plumb.mjs") && cmd.includes(" hook ");
+export const hookCommand = (tool, kind = "hook") => `node "${join(appDir(), "bin", "plumb.mjs")}" ${kind} ${tool}`;
+const isOurs = (cmd, kind = "hook") => typeof cmd === "string" && cmd.includes("plumb.mjs") && cmd.includes(` ${kind} `);
 
 function readJson(path) {
   if (!existsSync(path)) return {};
@@ -61,10 +61,11 @@ export function installClaudeCode({ api, token }) {
   const path = join(dir, "settings.json");
   const settings = readJson(path);
   settings.hooks ??= {};
-  for (const event of ["Stop", "SessionEnd"]) {
+  // Stop and SessionEnd save the session; SessionStart adds the "what changed" note.
+  for (const [event, kind] of [["Stop", "hook"], ["SessionEnd", "hook"], ["SessionStart", "hook-start"]]) {
     const groups = (settings.hooks[event] ??= []);
-    const present = groups.some((g) => (g.hooks ?? []).some((h) => isOurs(h.command)));
-    if (!present) groups.push({ hooks: [{ type: "command", command: hookCommand("claude-code") }] });
+    const present = groups.some((g) => (g.hooks ?? []).some((h) => isOurs(h.command, kind)));
+    if (!present) groups.push({ hooks: [{ type: "command", command: hookCommand("claude-code", kind) }] });
   }
   writeJson(path, settings);
   steps.push("hooks in ~/.claude/settings.json");
@@ -99,9 +100,9 @@ export function installCursor({ api, token }) {
   hooks.version ??= 1;
   hooks.hooks ??= {};
   // stop: the end of each agent response; sessionEnd: the chat closes.
-  for (const event of ["stop", "sessionEnd"]) {
+  for (const [event, kind] of [["stop", "hook"], ["sessionEnd", "hook"], ["sessionStart", "hook-start"]]) {
     const list = (hooks.hooks[event] ??= []);
-    if (!list.some((h) => isOurs(h.command))) list.push({ command: hookCommand("cursor") });
+    if (!list.some((h) => isOurs(h.command, kind))) list.push({ command: hookCommand("cursor", kind) });
   }
   writeJson(hooksPath, hooks);
 

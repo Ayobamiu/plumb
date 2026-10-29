@@ -21,8 +21,9 @@ import { fileURLToPath } from "node:url";
 import { post, PlumbError, saveSession } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
 import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, installSync, refreshApp } from "../lib/install.mjs";
+import { changeNote } from "../lib/note.mjs";
 import { scrub } from "../lib/scrub.mjs";
-import { listClaudeCodeSessions, readClaudeCodeTranscript } from "../lib/sources/claude-code.mjs";
+import { listClaudeCodeSessions, readClaudeCodeTranscript, repoRoot } from "../lib/sources/claude-code.mjs";
 import { listCursorChats } from "../lib/sources/cursor.mjs";
 import { readExport } from "../lib/sources/claude-export.mjs";
 
@@ -278,7 +279,47 @@ async function hookSend() {
   }
 }
 
-const commands = { init, backfill, import: importExport, status, sync, hook, "hook-send": hookSend };
+// The "what changed" note (Oct 29): at session start, at most 5 lines on what
+// in this folder went OUT or may be out of date since the last session here.
+// Nothing when nothing changed; never slows the start by more than a few seconds.
+const START_TIMEOUT_MS = 4000;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function hookStart() {
+  const tool = args[1];
+  let input = {};
+  try {
+    input = JSON.parse(readFileSync(0, "utf8") || "{}");
+  } catch {
+    /* no payload */
+  }
+  let note = "";
+  try {
+    const config = loadConfig();
+    const folder = input.workspace_roots?.[0] ?? input.cwd ?? process.env.CURSOR_PROJECT_DIR ?? process.cwd();
+    const workspace = repoRoot(folder);
+    if (config?.token && workspace) {
+      const { projects } = await post(config.api, "/tools/list_projects", {}, config.token, START_TIMEOUT_MS);
+      const project = projects.find((p) => p.workspace === workspace);
+      if (project) {
+        const state = loadState();
+        state.started ??= {};
+        const since = state.started[workspace] ?? new Date(Date.now() - WEEK_MS).toISOString();
+        const now = new Date().toISOString();
+        const got = await post(config.api, "/tools/get_project_state", { project_id: project.id, since }, config.token, START_TIMEOUT_MS);
+        note = changeNote(got.changed_since ?? []);
+        state.started[workspace] = now;
+        saveState(state);
+      }
+    }
+  } catch (err) {
+    hookLog(`start ${tool}: ${err.message}`);
+  }
+  if (tool === "cursor") process.stdout.write(JSON.stringify(note ? { additional_context: note } : {}) + "\n");
+  else if (note) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: note } }) + "\n");
+}
+
+const commands = { init, backfill, import: importExport, status, sync, hook, "hook-send": hookSend, "hook-start": hookStart };
 const run = commands[cmd];
 if (run && !cmd.startsWith("hook")) {
   try {
