@@ -234,7 +234,7 @@ const BASELINE_SCHEMA = {
 
 async function runLlmOnly(s: Scenario, model: JsonModel): Promise<SystemRun | null> {
   if (s.texts.length > 0 || s.actions.length > 0 || s.sweeps.length > 0) return null;
-  const developer = await loadPrompt("baseline.v1");
+  const developer = await loadPrompt("baseline.v2");
   // Neutral ids, so the model can't read hints from our keys.
   const ids = new Map(s.claims.map((c, i) => [`c${i + 1}`, c.temp_id]));
   const claimLines = s.claims.map((c, i) => `c${i + 1} [${c.kind}, written ${c.valid_from}] ${c.text}`).join("\n");

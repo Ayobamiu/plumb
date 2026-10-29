@@ -112,7 +112,7 @@ export function renderContext(input: ContextInput): string {
   const groups: [string, Claim[], boolean][] = [
     ["Still true", claims.filter((c) => c.status === "IN"), false],
     ["No longer true", claims.filter((c) => c.status === "OUT"), true],
-    ["Waiting for Usman's review", claims.filter((c) => c.status === "REVIEW"), true],
+    ["Waiting for your review", claims.filter((c) => c.status === "REVIEW"), true],
   ];
   for (const [heading, list, withWhy] of groups) {
     if (!list.length) continue;

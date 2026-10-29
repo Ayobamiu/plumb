@@ -42,13 +42,13 @@ export function explainChain(cause: Claim): string {
 export function explainRestored(cause?: Claim): string {
   return cause
     ? `Back IN because "${cause.text}" was restored and its other reasons still hold.`
-    : "Back IN because Usman marked it as still true.";
+    : "Back IN because you marked it as still true.";
 }
 
 export function explainEdited(oldText: string, from: ClaimStatus): string {
   return from === "IN"
-    ? `Usman edited it; it used to say "${oldText}".`
-    : `Back IN because Usman edited it; it used to say "${oldText}".`;
+    ? `You edited it; it used to say "${oldText}".`
+    : `Back IN because you edited it; it used to say "${oldText}".`;
 }
 
 /** Fold Usman's note into the explanation, keeping it one sentence. */
@@ -96,5 +96,5 @@ export function explainContradicted(sourceTitle: string, quote: string): string 
 }
 
 export function explainConfirmedOut(): string {
-  return "Went OUT because Usman confirmed it is no longer true.";
+  return "Went OUT because you confirmed it is no longer true.";
 }

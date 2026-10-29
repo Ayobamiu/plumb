@@ -24,7 +24,7 @@ const KIND_ORDER: [ClaimKind, string][] = [
 const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
 
 function changedLine(row: Changed, indent: string): string {
-  const label = row.transition.to_status === "REVIEW" ? "REVIEW (waiting for Usman)" : row.transition.to_status;
+  const label = row.transition.to_status === "REVIEW" ? "REVIEW (waiting for you)" : row.transition.to_status;
   return `${indent}- ${label}: ${sentence(row.claim.text)} ${row.transition.explanation}`;
 }
 
@@ -53,7 +53,7 @@ export function renderProjectState(state: State, opts: { since: string; now: str
   const lines = [
     `# Project state: ${state.project.name}`,
     "",
-    `Written by Plumb at ${formatTime(opts.now)}. Don't edit this file: it is rewritten at the start of each session. Claims marked REVIEW are waiting for Usman.`,
+    `Written by Plumb at ${formatTime(opts.now)}. Don't edit this file: it is rewritten at the start of each session. Claims marked REVIEW are waiting for you.`,
     "",
     `## Changed since ${formatTime(opts.since)}`,
     "",

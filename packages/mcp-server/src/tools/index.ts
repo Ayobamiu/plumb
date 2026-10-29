@@ -46,7 +46,7 @@ export const toolDescriptions: Record<ToolName, string> = {
     "Call at session end. Write new claims, each with at least one reason (depends_on, evidence, absence or until). Claims with no reason are rejected.",
   record_event: "Log something that happened (an email, a doc edit, a clock tick), then run invalidation.",
   explain_claim: "The reason chain and full status history for one claim.",
-  resolve_review: "Usman's decision on a claim: confirm_out, restore_in, or edit its text.",
+  resolve_review: "The user's decision on a claim: confirm_out, restore_in, or edit its text.",
   find_context:
     "Find a session, chat, doc or email thread from the user's other tools (Claude Code, Cursor, Claude chat, docs, Gmail) from a description in their own words, e.g. 'gym plan from Claude last week'. Pass their words as typed, not keywords. Returns the best match first, then up to 3 alternatives, each with a why. If nothing fits, only near misses come back and each why starts 'Not a clear match'; tell the user it wasn't found and offer them. Then call get_context with the uri.",
   get_context:

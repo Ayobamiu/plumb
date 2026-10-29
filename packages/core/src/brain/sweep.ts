@@ -17,7 +17,7 @@ import { loadPrompt, type JsonModel } from "./extract.js";
 import { hasCodePattern, type BrainState } from "./invalidate.js";
 import { isQuiet } from "./quiet.js";
 
-export const RECHECK_PROMPT = "sweep-recheck.v2";
+export const RECHECK_PROMPT = "sweep-recheck.v3";
 export const DUPLICATES_PROMPT = "sweep-duplicates.v1";
 const MAX_RECHECK = 30; // claims per sweep
 const MAX_EVENTS = 30; // newest events shown per claim
@@ -208,7 +208,7 @@ export async function findDuplicates(model: JsonModel, state: BrainState, modelI
 //    go to a list for Usman (link_suggestions), not to REVIEW, because REVIEW
 //    means "may no longer be true", which is a different question.
 
-export const LINKS_PROMPT = "sweep-links.v3";
+export const LINKS_PROMPT = "sweep-links.v4";
 const MAX_LINKS = 10; // per project per sweep
 const MAX_PLANS = 30; // claims asked about, per project per sweep
 const LINK_KINDS = new Set(["next_step", "decision", "goal"]); // the kinds that usually rest on something
@@ -321,7 +321,7 @@ export async function suggestLinks(
 //    a suggestion touching a quiet claim expires by code; others older than a
 //    day get one model question. Fresh ones are relevant by construction.
 
-export const RELEVANCE_PROMPT = "sweep-relevance.v1";
+export const RELEVANCE_PROMPT = "sweep-relevance.v2";
 const MAX_RELEVANCE = 20; // suggestions asked about per sweep
 const RELEVANCE_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -335,7 +335,7 @@ export interface PendingSuggestion {
 
 export interface ExpiredSuggestion {
   id: string;
-  note: string; // one line for Usman
+  note: string; // one line for the user
 }
 
 const Relevance = z.object({ live: z.boolean(), why: z.string() });

@@ -186,7 +186,7 @@ describe("resolve_review", () => {
     const out = await call("resolve_review", { claim_id: ids.noreply, action: "edit", text: "No written reply from Avery yet" });
     expect(store.claims.get(ids.noreply!)!.text).toBe("No written reply from Avery yet");
     expect(store.claims.get(ids.noreply!)!.status).toBe("IN");
-    expect(out.transitions[0].explanation).toBe('Back IN because Usman edited it; it used to say "No reply from Avery yet".');
+    expect(out.transitions[0].explanation).toBe('Back IN because you edited it; it used to say "No reply from Avery yet".');
 
     const again = await call("resolve_review", { claim_id: ids.noreply, action: "edit", text: "Still no reply" });
     expect(again.transitions[0]).toMatchObject({ from_status: "IN", to_status: "IN" });

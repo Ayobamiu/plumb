@@ -26,7 +26,7 @@ export interface SweepResult {
   rechecked: number; // claims the re-check asked the model about
   events: number; // events new since the last sweep
   transitions: Transition[]; // claims sent to REVIEW
-  links: number; // new link suggestions waiting for Usman
+  links: number; // new link suggestions waiting for the user
   expired: number; // pending suggestions retired as no longer relevant
 }
 

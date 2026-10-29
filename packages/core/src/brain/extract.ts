@@ -11,7 +11,7 @@ import { MUSE_SPARK, type JsonCallOptions } from "../meta/client.js";
 import type { NewClaim, NewReason } from "../tools.js";
 import { normalizeAddress } from "./invalidate.js";
 
-export const EXTRACT_PROMPT = "extract.v6";
+export const EXTRACT_PROMPT = "extract.v7";
 const MAX_CLAIMS = 20;
 const QUOTE_MAX = 200;
 const MAX_THREADS = 50;
@@ -169,10 +169,10 @@ export function buildExtractMessage(input: ExtractInput): string {
     ? input.in_claims.map((c, i) => `c${i + 1} [${c.kind}] ${c.text}`).join("\n")
     : "(none)";
   const threads = input.threads.length
-    ? input.threads.map((t) => `- thread_id ${t.thread_id}: "${t.subject}" with ${t.participants.join(", ") || "(only Usman)"}`).join("\n")
+    ? input.threads.map((t) => `- thread_id ${t.thread_id}: "${t.subject}" with ${t.participants.join(", ") || "(only the user)"}`).join("\n")
     : "(none)";
   return [
-    `Now: ${input.now}. Usman's time zone: America/New_York.`,
+    `Now: ${input.now}. The user's time zone: ${process.env.PLUMB_TZ ?? "America/New_York"}.`,
     `Text written at: ${input.at}`,
     `Source: ${input.source.kind}${input.source.title ? ` "${input.source.title}"` : ""}`,
     "",

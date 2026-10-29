@@ -9,7 +9,7 @@ import { explainModelCheck } from "./explain.js";
 import { loadPrompt, type JsonModel } from "./extract.js";
 import { normalizeAddress, type BrainState } from "./invalidate.js";
 
-export const CHECK_PROMPT = "check.v2";
+export const CHECK_PROMPT = "check.v3";
 const MAX_CANDIDATES = 8;
 const PARALLEL = 4;
 const QUOTE_MAX = 200;

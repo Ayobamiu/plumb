@@ -52,7 +52,7 @@ describe("contexts", () => {
     const out = await readContext(store, { uri: cc!.uri });
     expect(out.name).toMatch(/^Claude Code: Auth refactor: middleware done/);
     expect(out.markdown).toContain("## What happened");
-    expect(out.markdown).toContain("## No longer true\n\n- [status] All tests pass on main. Went OUT because Usman confirmed it is no longer true (note: CI is red).");
+    expect(out.markdown).toContain("## No longer true\n\n- [status] All tests pass on main. Went OUT because you confirmed it is no longer true (note: CI is red).");
     await expect(readContext(store, { uri: "cursor://nothing-deadbeef" })).rejects.toMatchObject({ code: "not_found" });
   });
 

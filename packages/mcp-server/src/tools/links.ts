@@ -14,7 +14,7 @@ import { createHandlers, ToolError } from "./handlers.js";
 import type { Store } from "./store.js";
 
 // Where accepted links come from, as a record_claims source.
-const SOURCE = { kind: "manual" as const, external_id: "usman-links", title: "Links Usman accepted" };
+const SOURCE = { kind: "manual" as const, external_id: "usman-links", title: "Links you accepted" };
 
 export async function listLinkSuggestions(
   store: Store,

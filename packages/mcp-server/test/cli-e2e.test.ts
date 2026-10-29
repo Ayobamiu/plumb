@@ -40,7 +40,7 @@ function run(args: string[], env: NodeJS.ProcessEnv, onOut?: (s: string) => void
   });
 }
 
-describe("npx plumb-cli init, end to end", () => {
+describe("npx plumb-ai init, end to end", () => {
   it("signs in a new user, installs, backfills with secrets stripped, and search finds the session", async () => {
     const store = new MemoryStore();
     const app = createHttpApp({ store, tokens: new Map(), ownerUserId: MEMORY_USER, host: "127.0.0.1", webUrl: "http://web.test", verifySession: async (t) => (t === "s" ? "user-new" : undefined), model });
