@@ -11,3 +11,4 @@ export * from "./brain/state-file.js";
 export * from "./brain/quiet.js";
 export * from "./brain/context.js";
 export * from "./brain/search.js";
+export * from "./brain/index-session.js";

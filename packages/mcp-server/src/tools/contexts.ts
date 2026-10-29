@@ -41,8 +41,9 @@ const HIDDEN = (s: Source) => s.external_id === "clock" || s.external_id === "us
 // - An email thread only counts if it matters: it produced claims, or a current
 //   claim is waiting on it (an absence reason names its thread). Newsletters don't.
 // - Docs are only the ones Usman chose to watch, so they're shared across projects.
-// - A tool session that produced no claims can't be placed, so it's left out of
-//   project lists (known limit: it only has a summary to offer anyway).
+// - A tool session is placed by its claims, or by the project it was indexed
+//   under (Source.project_id, Oct 28). One with neither is left out of project
+//   lists; unscoped search still finds it.
 function inProject(source: Source, project: string | undefined, wanted: string | undefined, watchedThreads: Set<string>): boolean {
   if (source.kind === "gmail_thread") return (project !== undefined && (!wanted || project === wanted)) || watchedThreads.has(source.external_id);
   if (project) return !wanted || project === wanted;
@@ -79,6 +80,7 @@ export async function listContexts(
   ]);
   const projectOf = new Map<string, string>();
   const latestClaim = new Map<string, Claim>(); // for older sessions with no summary to name them by
+  for (const s of sources) if (s.project_id) projectOf.set(s.id, s.project_id); // indexed sessions name their project
   for (const c of owned) {
     if (!projectOf.has(c.source_id)) projectOf.set(c.source_id, c.project_id);
     const seen = latestClaim.get(c.source_id);
@@ -190,12 +192,14 @@ export async function findContext(store: Store, input: z.infer<typeof FindContex
   const scope = { ...(input.project_id && { project_id: input.project_id }) };
   if (model) {
     const all = await listContexts(store, { ...scope, days: SEARCH_DAYS, limit: 1000 });
-    const claims = all.length ? await store.loadClaims({ source_ids: all.map((e) => e.source_id) }) : [];
+    const ids = all.map((e) => e.source_id);
+    const [claims, sources] = ids.length ? await Promise.all([store.loadClaims({ source_ids: ids }), store.loadSources(ids)]) : [[], []];
+    const personal = new Set(sources.filter((src) => src.label === "personal").map((src) => src.id));
     const said = new Map<string, Claim[]>();
     for (const c of claims) said.set(c.source_id, [...(said.get(c.source_id) ?? []), c]);
     const candidates: SearchCandidate[] = all.map((e) => ({
       id: e.source_id,
-      tool: e.tool,
+      tool: personal.has(e.source_id) ? `${e.tool} (personal)` : e.tool,
       last_at: e.last_at,
       ...(e.title && { title: e.title }),
       summary: e.description,

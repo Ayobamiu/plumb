@@ -8,10 +8,12 @@
 //    claim is never flagged by the text that created it.
 // 3. Current claims the text contradicts go to REVIEW.
 // 4. Current claims the text talks about get last_mentioned_at, for the quiet rule.
+// With index_only (Oct 28), only a title and summary are written: see indexOnly.
 import type { z } from "zod";
 import {
   explainContradicted,
   extractClaims,
+  indexSession,
   isGenericTitle,
   knownThreads,
   type IngestInput,
@@ -31,6 +33,8 @@ export async function ingest(
   model: JsonModel,
   input: z.infer<typeof IngestInput>,
 ): Promise<z.infer<typeof IngestOutput>> {
+  if (input.index_only) return indexOnly(store, model, input);
+  if (!input.project_id) throw new ToolError("bad_input", "project_id is required unless index_only is set");
   const project = await store.getProject(input.project_id);
   if (!project) throw new ToolError("not_found", `unknown project ${input.project_id}`);
 
@@ -121,5 +125,51 @@ export async function ingest(
     event_transitions: recordedEvent.transitions,
     dropped: result.dropped,
     truncated,
+  };
+}
+
+// Index mode: one low-effort call for a title, a summary and whether it's
+// personal, then the summary is recorded as an event so search can find the
+// session. No claims and no Part C model check, which keeps it cheap enough to
+// run on every session from every tool. Part B still runs (plain code).
+async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof IngestInput>): Promise<z.infer<typeof IngestOutput>> {
+  if (input.project_id && !(await store.getProject(input.project_id))) throw new ToolError("not_found", `unknown project ${input.project_id}`);
+  const now = new Date().toISOString();
+  const started = Date.now();
+  let indexed;
+  try {
+    indexed = await indexSession(model, { text: input.text, source: input.source });
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ ingest: input.source.kind, external_id: input.source.external_id, index_only: true, ok: false, error: why.slice(0, 300), chars: input.text.length, ms: Date.now() - started }));
+    throw new ToolError("unavailable", `indexing failed, nothing was saved; send the text again later (${why})`);
+  }
+
+  const nativeTitle = input.source.title?.trim();
+  const title = nativeTitle && !isGenericTitle(nativeTitle) ? nativeTitle : indexed.title || nativeTitle;
+  const label = input.source.label ?? (indexed.personal ? "personal" : undefined);
+  // Docs are shared across projects (see contexts.ts), so they never take one.
+  const project_id = input.source.kind === "doc" ? undefined : input.project_id;
+  const source = { ...input.source, ...(title && { title }), ...(label && { label }), ...(project_id && { project_id }) };
+
+  const recorded = await createHandlers(store, {}).record_event({
+    kind: source.kind === "doc" ? "doc_edited" : "session_note",
+    source,
+    occurred_at: input.at ?? now,
+    summary: indexed.summary || title || "(no summary)",
+  });
+  console.log(JSON.stringify({ ingest: source.kind, external_id: source.external_id, index_only: true, ok: true, chars: input.text.length, ms: Date.now() - started, label: label ?? null, title: source.title ?? null }));
+
+  return {
+    claims: [],
+    reasons: [],
+    id_map: {},
+    extracted_by: indexed.indexed_by,
+    review: [],
+    event: recorded.event,
+    event_transitions: recorded.transitions,
+    dropped: [],
+    truncated: false,
+    indexed_only: true,
   };
 }

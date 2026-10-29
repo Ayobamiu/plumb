@@ -29,6 +29,11 @@ export const Source = z.object({
   external_id: z.string(), // Gmail thread id, doc id, session id
   uri: z.string().optional(),
   title: z.string().optional(),
+  // Added Oct 28, Usman OK'd: personal chats carry a label instead of their own
+  // project (no label means work), and a source can name its project, so a
+  // session indexed without claims still shows in that project's @ list.
+  label: z.enum(["personal"]).optional(),
+  project_id: z.string().optional(),
 });
 export type Source = z.infer<typeof Source>;
 

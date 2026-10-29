@@ -116,17 +116,22 @@ export const ResolveReviewOutput = z.object({ transitions: z.array(Transition) }
 // ingest (POST /ingest, not an MCP tool): text in, claims out via extraction
 // (Brain Part A), then record_claims. Every write-back path ends here.
 export const IngestInput = z.object({
-  project_id: z.string(),
+  project_id: z.string().optional(), // required unless index_only (Oct 28)
   source: z.object({
     kind: SourceKind,
     external_id: z.string(),
     uri: z.string().optional(),
     title: z.string().optional(),
+    label: z.enum(["personal"]).optional(), // set by the caller when it knows; index mode also decides
   }),
+  // Index mode (Oct 28, Usman OK'd): one low-effort call writes a title and a
+  // summary so search can find the session; no claims, no model check.
+  index_only: z.boolean().optional(),
   text: z.string().min(1),
   at: Timestamp.optional(), // when the text was written; default now
 });
 export const IngestOutput = RecordClaimsOutput.extend({
+  indexed_only: z.boolean().optional(), // true when index_only ran: claims, review and dropped are empty
   extracted_by: z.string(),
   review: z.array(Transition), // current claims the text contradicts, sent to REVIEW
   event: Event, // the text as a doc_edited or session_note event, with a short summary

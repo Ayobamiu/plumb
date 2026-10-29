@@ -121,3 +121,54 @@ describe("contexts: search by description", () => {
     expect(found.contexts.map((c: any) => [c.title, c.why])).toEqual([["Login page wiring", undefined]]);
   });
 });
+
+describe("ingest: index mode", () => {
+  const indexer = (out: { title: string; summary: string; personal: boolean }, seen: string[] = []): JsonModel => ({
+    async json(opts) {
+      seen.push(opts.schemaName);
+      if (opts.schemaName === "index") return opts.parse.parse(out) as never;
+      throw new Error(`unexpected call ${opts.schemaName}`);
+    },
+  });
+
+  it("writes a title and summary only, labels personal chats, and makes them searchable", async () => {
+    const { store, project } = await setup();
+    const seen: string[] = [];
+    const out = await ingest(store, indexer({ title: "Push pull legs plan", summary: "A 6-day gym split with Sunday off.", personal: true }, seen), {
+      index_only: true,
+      source: { kind: "claude_chat", external_id: "chat-gym", title: "Claude chat" },
+      text: "User: help me plan a gym week...",
+    });
+    expect(seen).toEqual(["index"]); // one call: no extraction, no model check
+    expect(out.indexed_only).toBe(true);
+    expect(out.claims).toEqual([]);
+    const source = [...(store as any).sources].find((s: any) => s.external_id === "chat-gym");
+    expect(source).toMatchObject({ title: "Push pull legs plan", label: "personal" });
+    expect(source.project_id).toBeUndefined();
+
+    const found = await listContexts(store, { query: "gym split" });
+    expect(found.map((c) => c.title)).toEqual(["Push pull legs plan"]);
+    expect((await listContexts(store, { project_id: project.id })).map((c) => c.title)).not.toContain("Push pull legs plan");
+  });
+
+  it("places an indexed session in its project, and the caller's label and title win", async () => {
+    const { store, project } = await setup();
+    await ingest(store, indexer({ title: "Generated", summary: "Wired the export watcher.", personal: false }), {
+      index_only: true,
+      project_id: project.id,
+      source: { kind: "cursor", external_id: "conv-idx", title: "Export watcher", label: "personal" },
+      text: "Wired the export watcher.",
+    });
+    const [entry] = (await listContexts(store, { project_id: project.id })).filter((c) => c.title === "Export watcher");
+    expect(entry).toMatchObject({ project_id: project.id });
+    expect([...(store as any).sources].find((s: any) => s.external_id === "conv-idx").label).toBe("personal");
+  });
+
+  it("saves nothing when indexing fails, and full mode still needs a project", async () => {
+    const { store } = await setup();
+    const failing: JsonModel = { json: async () => { throw new Error("Meta API 503"); } };
+    await expect(ingest(store, failing, { index_only: true, source: { kind: "cursor", external_id: "conv-fail" }, text: "x" })).rejects.toMatchObject({ code: "unavailable" });
+    expect([...(store as any).sources].some((s: any) => s.external_id === "conv-fail")).toBe(false);
+    await expect(ingest(store, failing, { source: { kind: "cursor", external_id: "conv-np" }, text: "x" })).rejects.toMatchObject({ code: "bad_input" });
+  });
+});
