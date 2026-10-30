@@ -22,7 +22,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { post, PlumbError, saveSession } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
-import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, installSync, refreshApp, uninstall } from "../lib/install.mjs";
+import { copyApp, hasClaudeCode, hasClaudeDesktop, hasCursor, installClaudeCode, installClaudeDesktop, installCursor, installSync, refreshApp, uninstall } from "../lib/install.mjs";
 import { changeNote } from "../lib/note.mjs";
 import { scrub } from "../lib/scrub.mjs";
 import { listClaudeCodeSessions, readClaudeCodeTranscript, repoRoot } from "../lib/sources/claude-code.mjs";
@@ -112,6 +112,7 @@ async function setUp() {
   for (const [name, present, install] of [
     ["Claude Code", hasClaudeCode(), installClaudeCode],
     ["Cursor", hasCursor(), installCursor],
+    ["Claude Desktop", hasClaudeDesktop(), installClaudeDesktop],
   ]) {
     if (!present) {
       console.log(`${name}: not found on this computer, skipped.`);
@@ -120,7 +121,7 @@ async function setUp() {
     console.log(`${name}: ${install(config).join("; ")}.`);
   }
   console.log(`Safety net: ${installSync().join("; ")}.`);
-  console.log("\nNew sessions now save on their own. Restart Claude Code and Cursor to load the changes.\n");
+  console.log("\nNew sessions now save on their own. Restart Claude Code, Cursor and Claude Desktop to load the changes.\n");
 
   if (!flag("--no-backfill")) await backfill();
   console.log("Claude chats (claude.ai and the desktop app) live on Anthropic's servers. To bring them in:");
@@ -299,6 +300,31 @@ async function deleteAccount() {
   console.log(`Removed: ${uninstall().join("; ")}.`);
 }
 
+// The bridge Claude Desktop launches: MCP over stdin and stdout on one side,
+// the Plumb server on the other. One JSON message per line, answered in order.
+async function mcpBridge() {
+  const config = need();
+  const url = `${config.api.replace(/\/$/, "")}/mcp`;
+  const rl = createInterface({ input: process.stdin });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    let id;
+    try {
+      id = JSON.parse(line).id;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${config.token}` },
+        body: line,
+      });
+      const text = await res.text();
+      if (text.trim()) process.stdout.write(text.replace(/\n/g, " ").trim() + "\n");
+      else if (id !== undefined) throw new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      if (id !== undefined) process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message: `Plumb: ${err.message}` } }) + "\n");
+    }
+  }
+}
+
 // ---- hooks (run by Claude Code and Cursor; must never block or fail them) ----
 
 function hookLog(line) {
@@ -393,9 +419,9 @@ async function hookStart() {
   else if (note) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: note } }) + "\n");
 }
 
-const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, hook, "hook-send": hookSend, "hook-start": hookStart };
+const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, mcp: mcpBridge, hook, "hook-send": hookSend, "hook-start": hookStart };
 const run = commands[cmd];
-if (run && !cmd.startsWith("hook")) {
+if (run && !cmd.startsWith("hook") && cmd !== "mcp") {
   try {
     refreshApp();
   } catch {

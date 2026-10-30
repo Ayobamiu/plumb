@@ -119,6 +119,20 @@ describe("npx plumb-ai init, end to end", () => {
       expect(note.hookSpecificOutput.additionalContext).toContain("- No longer true: Deploy the login page Friday. Went OUT because you confirmed it is no longer true.");
       expect((await start(cwd)).out.trim()).toBe(""); // shown once, then quiet
 
+      // Claude Desktop's side: MCP over stdin through the local bridge.
+      const rpc = (id: number, method: string, params: unknown = {}) => JSON.stringify({ jsonrpc: "2.0", id, method, params });
+      const bridge = await run(["mcp"], env, undefined, [
+        rpc(1, "initialize", { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "test", version: "1" } }),
+        JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+        rpc(2, "tools/list"),
+        rpc(3, "prompts/list"),
+      ].join("\n") + "\n");
+      const answers = bridge.out.trim().split("\n").map((l) => JSON.parse(l));
+      expect(answers.map((a) => a.id)).toEqual([1, 2, 3]);
+      expect(answers[0].result.instructions).toContain("When a message starts with /plumb");
+      expect(answers[1].result.tools.map((t: any) => t.name)).toContain("find_context");
+      expect(answers[2].result.prompts.map((t: any) => t.name)).toEqual(["plumb"]);
+
       // And the user finds it by description, through the same token.
       const found = await (await fetch(`${api}/tools/find_context`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${config.token}` }, body: JSON.stringify({ query: "my gym plan from last week" }) })).json();
       expect(found.contexts.map((c: any) => [c.title, c.why])).toEqual([["Gym week plan", "It's the gym plan."]]);

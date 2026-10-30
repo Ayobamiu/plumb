@@ -10,6 +10,7 @@ import {
   type ToolName,
 } from "./tools/index.js";
 import * as tools from "./tools/index.js";
+import { z } from "zod";
 
 type ContextEntry = {
   uri: string;
@@ -60,8 +61,26 @@ function uriSlug(uri: string): string {
   return i >= 0 ? uri.slice(i + 3) : uri;
 }
 
+// Claude Desktop and claude.ai have no custom slash commands, so /plumb lives
+// here: every MCP client gets these instructions, nobody pastes anything (Oct 30).
+const INSTRUCTIONS = `Plumb brings in context from the user's other AI tools, corrected for what changed since.
+When a message starts with /plumb, or the user refers to work done in another tool:
+1. If there are no words after /plumb, call list_projects, pick the project this work belongs to, and call get_project_state with its project_id. Say what changed (OUT, or May be out of date) with the one-line reason, then what is current. Stop.
+2. Otherwise call find_context with the user's words as typed, not keywords.
+3. If the first why starts "Not a clear match", or there are no results, don't call get_context. Say it wasn't found and list any near misses with their why.
+4. If the first why starts "Basic search", the smart search is down: say so in one line, show the results and let the user pick.
+5. Otherwise call get_context on the first result, say in one line why it fits, and list the others in one line each.
+Present get_context as: what happened, what is still true, what is no longer true and why, and what may be out of date. Keep it short and plain.`;
+
 export function createPlumbMcp(store: Store): McpServer {
-  const server = new McpServer({ name: "plumb", version: "0.1.0" });
+  const server = new McpServer({ name: "plumb", version: "0.1.0" }, { instructions: INSTRUCTIONS });
+
+  // Shows in Claude Desktop's + menu as well.
+  server.registerPrompt(
+    "plumb",
+    { description: "Bring in context from your other AI tools", argsSchema: { request: z.string().optional() } },
+    ({ request }) => ({ messages: [{ role: "user", content: { type: "text", text: `/plumb ${request ?? ""}`.trim() } }] }),
+  );
 
   for (const name of Object.keys(toolInputs) as ToolName[]) {
     server.registerTool(

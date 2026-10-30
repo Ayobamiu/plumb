@@ -154,3 +154,17 @@ test("uninstall removes only Plumb's entries and leaves everything else", async 
   assert.ok(!existsSync(process.env.PLUMB_HOME));
   if (process.platform === "darwin") assert.ok(!existsSync(join(tmp, "Library", "LaunchAgents", "ai.plumb.sync.plist")));
 });
+
+test("Claude Desktop: init adds the bridge next to other servers, uninstall takes it out", async () => {
+  const { installClaudeDesktop, desktopConfigPath, uninstall } = await import("../lib/install.mjs");
+  const path = desktopConfigPath();
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, JSON.stringify({ mcpServers: { docs: { command: "npx" } }, preferences: { a: 1 } }));
+  installClaudeDesktop();
+  const c = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual(Object.keys(c.mcpServers).sort(), ["docs", "plumb"]);
+  assert.match(c.mcpServers.plumb.args.join(" "), /plumb\.mjs mcp$/);
+  assert.deepEqual(c.preferences, { a: 1 });
+  uninstall();
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(path, "utf8")).mcpServers), ["docs"]);
+});

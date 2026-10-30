@@ -110,6 +110,24 @@ export function installCursor({ api, token }) {
   return ["MCP server in ~/.cursor/mcp.json", "hooks in ~/.cursor/hooks.json", "/plumb in ~/.cursor/commands"];
 }
 
+// Claude Desktop launches local MCP servers (like the docs server), so a small
+// bridge (`plumb mcp`) carries its calls to Plumb with the saved token.
+export function desktopConfigPath() {
+  const base = process.platform === "darwin" ? join(homedir(), "Library", "Application Support") : process.env.APPDATA || join(homedir(), ".config");
+  return join(base, "Claude", "claude_desktop_config.json");
+}
+
+export const hasClaudeDesktop = () => existsSync(dirname(desktopConfigPath()));
+
+export function installClaudeDesktop() {
+  const path = desktopConfigPath();
+  const config = readJson(path);
+  config.mcpServers ??= {};
+  config.mcpServers.plumb = { command: process.execPath, args: [join(appDir(), "bin", "plumb.mjs"), "mcp"] };
+  writeJson(path, config);
+  return ["MCP server in claude_desktop_config.json (type /plumb in any chat)"];
+}
+
 export const hasClaudeCode = () => existsSync(join(homedir(), ".claude"));
 export const hasCursor = () => existsSync(join(homedir(), ".cursor"));
 
@@ -201,6 +219,15 @@ export function uninstall() {
     dropHooks(h.hooks);
     writeFileSync(cursorHooks, JSON.stringify(h, null, 2) + "\n");
     done.push("Cursor hooks");
+  }
+  const desktop = desktopConfigPath();
+  if (existsSync(desktop)) {
+    const d = readJson(desktop);
+    if (d.mcpServers?.plumb) {
+      delete d.mcpServers.plumb;
+      writeFileSync(desktop, JSON.stringify(d, null, 2) + "\n");
+      done.push("Claude Desktop MCP server");
+    }
   }
   for (const dir of [join(homedir(), ".claude", "commands"), join(homedir(), ".cursor", "commands")]) rmSync(join(dir, "plumb.md"), { force: true });
   done.push("/plumb");
