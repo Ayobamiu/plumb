@@ -110,3 +110,24 @@ test("the session-start note: at most 5 plain lines, nothing when nothing change
   const h = JSON.parse(readFileSync(join(tmp, ".cursor", "hooks.json"), "utf8"));
   assert.match(h.hooks.sessionStart[0].command, /hook-start cursor$/);
 });
+
+test("reads current Cursor's agent transcripts, finds the folder from the slug, and merges with the old database", async () => {
+  const projects = join(tmp, "cursor-projects");
+  const folder = join(tmp, "Documents", "core-extract-landing");
+  mkdirSync(folder, { recursive: true });
+  const slug = folder.slice(1).split("/").join("-");
+  const dir = join(projects, slug, "agent-transcripts", "chat-new");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "chat-new.jsonl"), [
+    { role: "user", message: { content: [{ type: "text", text: "<timestamp>Thu, Oct 29</timestamp>\n<user_query>\nWhy did the self-serve signup fail?\n</user_query>" }] } },
+    { role: "assistant", message: { content: [{ type: "tool_use", name: "Read" }, { type: "text", text: "The webhook secret was missing." }] } },
+  ].map((r) => JSON.stringify(r)).join("\n") + "\n");
+  process.env.PLUMB_CURSOR_PROJECTS = projects;
+  const { listCursorChats, folderFromSlug } = await import("../lib/sources/cursor.mjs");
+  assert.equal(folderFromSlug(slug), folder);
+  const chats = await listCursorChats();
+  assert.deepEqual(chats.map((c) => c.external_id).sort(), ["c1", "chat-new"]); // c1 from the old database test
+  const r = chats.find((c) => c.external_id === "chat-new").read();
+  assert.equal(r.workspace, folder);
+  assert.equal(r.text, "User:\nWhy did the self-serve signup fail?\n\nCursor:\nThe webhook secret was missing.");
+});

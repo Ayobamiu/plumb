@@ -160,22 +160,37 @@ async function send(config, sessions, opts = {}) {
   let skipped = 0;
   let failed = 0;
   let stop;
-  const queue = [...sessions];
+  const queue = sessions.map((s) => ({ s, tries: 0 }));
+  let busyInARow = 0;
   const progress = () => !opts.quiet && process.stdout.write(`\r  saved ${sent}, unchanged ${skipped}, failed ${failed}`);
   async function worker() {
     while (queue.length && !stop) {
-      const s = queue.shift();
+      const item = queue.shift();
+      const s = item.s;
       try {
         if (await saveOne(config, state, s, s.read(), opts)) {
           sent++;
           if (sent % 5 === 0) saveState(state);
         } else skipped++;
+        busyInARow = 0;
         progress();
       } catch (err) {
-        failed++;
-        if (err.status === 401) stop = "Your token isn't valid any more. Run plumb init again.";
-        else if (err.status === 503) stop = "Plumb's model is busy right now. Run the same command later; it picks up where it stopped.";
-        else if (!opts.quiet) console.error(`\n  ${s.tool} ${s.external_id}: ${err.message}`);
+        if (err.status === 401) {
+          failed++;
+          stop = "Your token isn't valid any more. Run plumb init again.";
+        } else if (err.status === 503) {
+          // Meta's model API comes and goes (Oct 29): try this session again
+          // later in the run, and give up only if it stays down.
+          busyInARow++;
+          if (++item.tries < 3) queue.push(item);
+          else failed++;
+          if (busyInARow >= 6) stop = "Plumb's model is busy right now. Run the same command later; it picks up where it stopped.";
+          else await new Promise((r) => setTimeout(r, 5000));
+        } else {
+          failed++;
+          if (!opts.quiet) console.error(`\n  ${s.tool} ${s.external_id}: ${err.message}`);
+        }
+        progress();
       }
     }
   }

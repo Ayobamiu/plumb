@@ -3,10 +3,10 @@
 // message (type 1 user, 2 assistant). Read-only; Cursor can stay open. The chat
 // id is the conversation_id Cursor's hooks send. Most chats there are empty
 // drafts; a chat counts once it has a message with text.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { homedir, platform } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 
 export function cursorDbPath() {
   if (process.env.PLUMB_CURSOR_DB) return process.env.PLUMB_CURSOR_DB;
@@ -84,7 +84,88 @@ export function readCursorChat(db, chatId) {
   return { text: turns.join("\n\n"), list: turns, turns: turns.length, first_at: iso(msgs[0]?.createdAt), last_at: iso(msgs.at(-1)?.createdAt) };
 }
 
+// Current Cursor (seen Oct 29) no longer writes chats to state.vscdb: each
+// agent chat is a transcript at ~/.cursor/projects/<folder slug>/agent-transcripts/<chat id>/<chat id>.jsonl.
+const transcriptsRoot = () => process.env.PLUMB_CURSOR_PROJECTS || join(homedir(), ".cursor", "projects");
+
+/** "Users-me-Documents-core-extract-landing" -> /Users/me/Documents/core-extract-landing, checked against the disk. */
+export function folderFromSlug(slug) {
+  const parts = slug.split("-").filter(Boolean);
+  const walk = (dir, i) => {
+    if (i === parts.length) return dir;
+    // Try the longest name first: folder names can hold dashes themselves.
+    for (let j = parts.length; j > i; j--) {
+      const next = join(dir, parts.slice(i, j).join("-"));
+      if (existsSync(next) && statSync(next).isDirectory()) {
+        const found = walk(next, j);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  return walk(sep, 0);
+}
+
+function textOf(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.filter((p) => p?.type === "text" && typeof p.text === "string").map((p) => p.text).join("\n");
+}
+
+/** User text arrives as <timestamp>...</timestamp><user_query>...</user_query>. */
+const cleanUser = (t) => {
+  const q = /<user_query>([\s\S]*?)<\/user_query>/.exec(t);
+  return (q ? q[1] : t.replace(/<timestamp>[\s\S]*?<\/timestamp>/g, "")).trim();
+};
+
+export function readCursorTranscript(path) {
+  const turns = [];
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    let row;
+    try {
+      row = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const role = row.role ?? row.message?.role;
+    const raw = textOf(row.message?.content ?? row.content).trim();
+    const text = role === "user" ? cleanUser(raw) : raw;
+    if (!text || (role !== "user" && role !== "assistant")) continue;
+    turns.push(`${role === "user" ? "User" : "Cursor"}:\n${text}`);
+  }
+  const mtime = statSync(path).mtime.toISOString();
+  return { text: turns.join("\n\n"), list: turns, turns: turns.length, last_at: mtime };
+}
+
+export function listCursorTranscripts() {
+  const root = transcriptsRoot();
+  if (!existsSync(root)) return [];
+  const out = [];
+  for (const slug of readdirSync(root)) {
+    const dir = join(root, slug, "agent-transcripts");
+    if (!existsSync(dir)) continue;
+    const workspace = folderFromSlug(slug) ?? "chats";
+    for (const id of readdirSync(dir)) {
+      const file = join(dir, id, `${id}.jsonl`);
+      if (!existsSync(file)) continue;
+      out.push({ tool: "Cursor", kind: "cursor", external_id: id, workspace, modified_at: statSync(file).mtime.toISOString(), read: () => ({ ...readCursorTranscript(file), workspace }) });
+    }
+  }
+  return out;
+}
+
+/** Every Cursor chat: the old database and the newer transcripts, one entry per chat (the newer copy wins). */
 export async function listCursorChats() {
+  const byId = new Map();
+  for (const c of await listCursorDbChats()) byId.set(c.external_id, c);
+  for (const t of listCursorTranscripts()) {
+    const old = byId.get(t.external_id);
+    if (!old || Date.parse(t.modified_at) >= Date.parse(old.modified_at ?? 0)) byId.set(t.external_id, { ...t, ...(old?.title && { title: old.title }) });
+  }
+  return [...byId.values()];
+}
+
+async function listCursorDbChats() {
   const db = await open();
   if (!db) return [];
   const folders = await chatFolders(db);

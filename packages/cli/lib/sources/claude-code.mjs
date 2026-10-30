@@ -50,7 +50,10 @@ export function readClaudeCodeTranscript(path) {
     if (!text || (role !== "user" && role !== "assistant")) continue;
     turns.push(`${role === "user" ? "User" : "Claude Code"}:\n${text}`);
   }
-  return { text: turns.join("\n\n"), list: turns, turns: turns.length, cwd, workspace: repoRoot(cwd) ?? "chats", first_at: first, last_at: last };
+  const root = repoRoot(cwd);
+  // A session started in the home folder belongs to no project: it goes with chats.
+  const workspace = !root || root === homedir() ? "chats" : root;
+  return { text: turns.join("\n\n"), list: turns, turns: turns.length, cwd, workspace, first_at: first, last_at: last };
 }
 
 export function listClaudeCodeSessions() {
