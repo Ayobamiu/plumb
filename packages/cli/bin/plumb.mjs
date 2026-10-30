@@ -24,7 +24,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { post, PlumbError, saveSession } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
-import { copyApp, hasClaudeCode, hasClaudeDesktop, hasCursor, installClaudeCode, installClaudeDesktop, installCursor, installSync, refreshApp, uninstall } from "../lib/install.mjs";
+import { copyApp, hasClaudeCode, hasClaudeDesktop, hasCursor, installClaudeCode, installClaudeDesktop, installCursor, installSync, makeDesktopSkill, refreshApp, uninstall } from "../lib/install.mjs";
 import { changeNote } from "../lib/note.mjs";
 import { scrub } from "../lib/scrub.mjs";
 import { listClaudeCodeSessions, readClaudeCodeTranscript, repoRoot } from "../lib/sources/claude-code.mjs";
@@ -123,6 +123,14 @@ async function setUp() {
     console.log(`${name}: ${install(config).join("; ")}.`);
   }
   console.log(`Safety net: ${installSync().join("; ")}.`);
+  if (hasClaudeDesktop()) {
+    try {
+      const zip = makeDesktopSkill();
+      console.log(`\nFor /plumb in Claude Desktop: Settings > Capabilities > Skills > Upload, and pick ${zip}`);
+    } catch {
+      /* no zip command: Desktop still works through its + menu */
+    }
+  }
   console.log("\nNew sessions now save on their own. Restart Claude Code, Cursor and Claude Desktop to load the changes.\n");
 
   if (!flag("--no-backfill")) await backfill();

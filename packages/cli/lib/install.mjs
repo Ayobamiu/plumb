@@ -125,7 +125,15 @@ export function installClaudeDesktop() {
   config.mcpServers ??= {};
   config.mcpServers.plumb = { command: process.execPath, args: [join(appDir(), "bin", "plumb.mjs"), "mcp"] };
   writeJson(path, config);
-  return ["MCP server in claude_desktop_config.json (type /plumb in any chat)"];
+  return ["MCP server in claude_desktop_config.json"];
+}
+
+/** Desktop's / menu lists Skills only, and Skills are uploaded by hand: this makes the file to upload. */
+export function makeDesktopSkill() {
+  const zip = join(home(), "plumb-skill.zip");
+  rmSync(zip, { force: true });
+  execFileSync("zip", ["-qr", zip, "plumb"], { cwd: join(appDir(), "assets", "skill-root") });
+  return zip;
 }
 
 export const hasClaudeCode = () => existsSync(join(homedir(), ".claude"));
