@@ -41,7 +41,8 @@ function need() {
     console.error("Not signed in. Run: npx plumb-ai init");
     process.exit(1);
   }
-  return c;
+  // PLUMB_API_URL points one run at another server (for example a local one) with the same token.
+  return process.env.PLUMB_API_URL ? { ...c, api: process.env.PLUMB_API_URL } : c;
 }
 
 async function ask(question) {
