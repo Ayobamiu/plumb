@@ -7,10 +7,12 @@ import {
   contextUri,
   displayTitle,
   EventKind,
+  gatherCandidates,
   matchesQuery,
   parseContextUri,
   renderContext,
   searchByDescription,
+  sharedWords,
   toolLabel,
   type Claim,
   type ContextEntry,
@@ -33,6 +35,8 @@ const RESOLVE_DAYS = 90; // an @ link stays readable a while after it drops off 
 const NEWS_KINDS = EventKind.options.filter((k) => k !== "clock");
 const MAX_CHANGED = 10;
 export const NO_MATCH = "Not a clear match";
+export const BASIC_SEARCH = "Basic search";
+const BASIC_RESULTS = 5;
 
 // Plumbing sources, not work anyone would @.
 const HIDDEN = (s: Source) => s.external_id === "clock" || s.external_id === "usman-links" || s.external_id.startsWith("smoke-");
@@ -204,38 +208,40 @@ async function relatedFor(store: Store, ownIds: string[]) {
 }
 
 // find_context. With a model (Oct 28), the query is a description in the
-// user's own words: Muse Spark picks the session they mean from recent ones,
+// user's own words: the model picks the session they mean from recent ones,
 // and contexts come back best first, then up to 3 alternatives, each with a
 // why. When nothing fits, only the near misses come back, each why starting
-// "Not a clear match". Without a model, or if the call fails, every query word must
-// match (matchesQuery), newest first.
+// "Not a clear match". Without a model, or if the call fails (Oct 30), the
+// sessions sharing the most words come back, each why starting "Basic search",
+// so a failed model never looks like "nothing saved".
 export async function findContext(store: Store, input: z.infer<typeof FindContextInput>, model?: JsonModel) {
   const scope = { ...(input.project_id && { project_id: input.project_id }) };
+  const all = await listContexts(store, { ...scope, days: SEARCH_DAYS, limit: 1000 });
+  const ids = all.map((e) => e.source_id);
+  const [claims, sources] = ids.length ? await Promise.all([store.loadClaims({ source_ids: ids }), store.loadSources(ids)]) : [[], []];
+  const personal = new Set(sources.filter((src) => src.label === "personal").map((src) => src.id));
+  const said = new Map<string, Claim[]>();
+  for (const c of claims) said.set(c.source_id, [...(said.get(c.source_id) ?? []), c]);
+  const candidates: SearchCandidate[] = all.map((e) => ({
+    id: e.source_id,
+    tool: personal.has(e.source_id) ? `${e.tool} (personal)` : e.tool,
+    last_at: e.last_at,
+    ...(e.title && { title: e.title }),
+    summary: e.description,
+    claims: (said.get(e.source_id) ?? []).sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at)).map((c) => c.text),
+  }));
+  const byId = new Map(all.map((e) => [e.source_id, e]));
   if (model) {
-    const all = await listContexts(store, { ...scope, days: SEARCH_DAYS, limit: 1000 });
-    const ids = all.map((e) => e.source_id);
-    const [claims, sources] = ids.length ? await Promise.all([store.loadClaims({ source_ids: ids }), store.loadSources(ids)]) : [[], []];
-    const personal = new Set(sources.filter((src) => src.label === "personal").map((src) => src.id));
-    const said = new Map<string, Claim[]>();
-    for (const c of claims) said.set(c.source_id, [...(said.get(c.source_id) ?? []), c]);
-    const candidates: SearchCandidate[] = all.map((e) => ({
-      id: e.source_id,
-      tool: personal.has(e.source_id) ? `${e.tool} (personal)` : e.tool,
-      last_at: e.last_at,
-      ...(e.title && { title: e.title }),
-      summary: e.description,
-      claims: (said.get(e.source_id) ?? []).sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at)).map((c) => c.text),
-    }));
     try {
       const found = await searchByDescription(model, input.query, candidates, new Date().toISOString());
-      const byId = new Map(all.map((e) => [e.source_id, e]));
       const picked = found.best
         ? [found.best, ...found.alternatives]
         : found.alternatives.map((a) => ({ id: a.id, why: `${NO_MATCH}: ${a.why}` }));
       return { contexts: picked.map((m) => ({ ...byId.get(m.id)!, why: m.why })).slice(0, input.limit ?? 30) };
     } catch {
-      // fall through to keyword matching: a failed model call shouldn't leave the user with nothing
+      // fall through to basic search: a failed model call must not look like "nothing saved"
     }
   }
-  return { contexts: await listContexts(store, { ...scope, query: input.query, ...(input.limit && { limit: input.limit }) }) };
+  const matched = gatherCandidates(candidates, input.query).filter((c) => sharedWords(c, input.query) > 0).slice(0, input.limit ?? BASIC_RESULTS);
+  return { contexts: matched.map((c) => ({ ...byId.get(c.id)!, why: `${BASIC_SEARCH}: shares ${sharedWords(c, input.query)} word(s) with your request` })) };
 }

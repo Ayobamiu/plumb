@@ -59,7 +59,7 @@ describe("contexts", () => {
   it("works through the tools any MCP client calls: find_context then get_context", async () => {
     const { store } = await setup();
     const found: any = await callTool(store, "find_context", { query: "cursor login" }, { model: null });
-    expect(found.contexts).toHaveLength(1);
+    expect(found.contexts[0].title).toBe("Login page wiring");
     const got: any = await callTool(store, "get_context", { uri: found.contexts[0].uri }, { model: null });
     expect(got.markdown).toContain("## Still true\n\n- [next step] Login page ships Friday");
     await expect(callTool(store, "get_context", {}, { model: null })).rejects.toMatchObject({ code: "bad_input" });
@@ -118,7 +118,8 @@ describe("contexts: search by description", () => {
     const { store } = await setup();
     const failing: JsonModel = { json: async () => { throw new Error("Meta API 503"); } };
     const found: any = await callTool(store, "find_context", { query: "cursor login" }, { model: failing });
-    expect(found.contexts.map((c: any) => [c.title, c.why])).toEqual([["Login page wiring", undefined]]);
+    expect(found.contexts[0].title).toBe("Login page wiring"); // the most shared words first
+    expect(found.contexts[0].why).toMatch(/^Basic search: shares 2 word/);
   });
 });
 
