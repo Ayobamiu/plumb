@@ -13,6 +13,7 @@ import {
   MetaClient,
   ExplainClaimInput,
   FindContextInput,
+  RecentWorkInput,
   GetContextInput,
   GetProjectStateInput,
   ListProjectsInput,
@@ -32,6 +33,7 @@ export const toolInputs = {
   explain_claim: ExplainClaimInput,
   resolve_review: ResolveReviewInput,
   find_context: FindContextInput,
+  recent_work: RecentWorkInput,
   get_context: GetContextInput,
 } as const;
 
@@ -49,6 +51,8 @@ export const toolDescriptions: Record<ToolName, string> = {
   resolve_review: "The user's decision on a claim: confirm_out, restore_in, or edit its text.",
   find_context:
     "Find a session, chat, doc or email thread from the user's other tools (Claude Code, Cursor, Claude chat, docs, Gmail) from a description in their own words, e.g. 'gym plan from Claude last week'. Pass their words as typed, not keywords. Returns the best match first, then up to 3 alternatives, each with a why. If nothing fits, only near misses come back and each why starts 'Not a clear match'; tell the user it wasn't found and offer them. Then call get_context with the uri.",
+  recent_work:
+    "List what the user worked on recently, newest first, with a summary of each session. Use it when they ask about a span of time across sessions, e.g. 'what did I build in Claude Code this week'. Pass the tool if they name one, and days (default 7).",
   get_context:
     "Get what a session from another tool said, and what of it is still true now: what happened, what it decided and planned (still true / no longer true and why / waiting for review), and what changed since. Pass the uri from find_context or an @ mention.",
 };
@@ -79,7 +83,7 @@ export async function callTool(
 
 export { createHandlers, ToolError, type HandlerOptions, type ReviewItem } from "./handlers.js";
 export { ingest } from "./ingest.js";
-export { findContext, listContexts, readContext } from "./contexts.js";
+export { findContext, listContexts, readContext, recentWork } from "./contexts.js";
 export { knownThreads } from "@plumb/core"; // moved to core; kept here for existing imports
 export { sweep, type SweepResult } from "./sweep.js";
 export { listLinkSuggestions, resolveLinkSuggestion } from "./links.js";

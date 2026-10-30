@@ -21,6 +21,7 @@ import {
   type GetContextInput,
   type GetContextOutput,
   type JsonModel,
+  type RecentWorkInput,
   type SearchCandidate,
   type Source,
   type Transition,
@@ -244,4 +245,21 @@ export async function findContext(store: Store, input: z.infer<typeof FindContex
   }
   const matched = gatherCandidates(candidates, input.query).filter((c) => sharedWords(c, input.query) > 0).slice(0, input.limit ?? BASIC_RESULTS);
   return { contexts: matched.map((c) => ({ ...byId.get(c.id)!, why: `${BASIC_SEARCH}: shares ${sharedWords(c, input.query)} word(s) with your request` })) };
+}
+
+const RECENT_DAYS = 7;
+const RECENT_LIMIT = 30;
+
+/** Sessions active in the last few days, newest first: what "this week" spans. Saved earlier work isn't counted by when it was saved. */
+export async function recentWork(store: Store, input: z.infer<typeof RecentWorkInput>) {
+  const days = input.days ?? RECENT_DAYS;
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+  const wanted = input.tool?.toLowerCase().replace(/[^a-z]/g, "");
+  const all = await listContexts(store, { ...(input.project_id && { project_id: input.project_id }), days, limit: 1000 });
+  const sessions = all
+    .filter((e) => Date.parse(e.last_at) >= Date.parse(since))
+    .filter((e) => e.tool !== "Email")
+    .filter((e) => !wanted || e.tool.toLowerCase().replace(/[^a-z]/g, "").includes(wanted))
+    .slice(0, RECENT_LIMIT);
+  return { since, sessions };
 }

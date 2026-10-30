@@ -209,6 +209,15 @@ export const FindContextInput = z.object({
 });
 export const FindContextOutput = z.object({ contexts: z.array(ContextEntry) });
 
+// recent_work (added Oct 30, Usman OK'd): "what did I build this week" spans
+// sessions, so it lists them by time instead of picking one. Plain code.
+export const RecentWorkInput = z.object({
+  tool: z.string().optional(), // "Claude Code", "cursor", ...; every tool if left out
+  days: z.number().int().min(1).max(90).optional(), // default 7
+  project_id: z.string().optional(),
+});
+export const RecentWorkOutput = z.object({ since: Timestamp, sessions: z.array(ContextEntry) });
+
 // A plain object (no .refine): MCP clients only see inputs they can describe,
 // and a refined schema showed up with no inputs at all. "One of the two" is
 // checked in the handler.

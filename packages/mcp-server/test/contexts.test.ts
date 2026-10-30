@@ -186,3 +186,15 @@ describe("ingest: index mode", () => {
     await expect(ingest(store, failing, { source: { kind: "cursor", external_id: "conv-np" }, text: "x" })).rejects.toMatchObject({ code: "bad_input" });
   });
 });
+
+describe("recent_work", () => {
+  it("lists this week's sessions for a tool, not older ones or email", async () => {
+    const { store, project } = await setup();
+    const old = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+    await ingest(store, model(extraction("Old cursor work")), { project_id: project.id, source: { kind: "cursor", external_id: "conv-old" }, text: "old", at: old });
+    const week: any = await callTool(store, "recent_work", { tool: "claude code" }, { model: null });
+    expect(week.sessions.map((s: any) => s.title)).toEqual(["Auth refactor: middleware done"]);
+    const cursor: any = await callTool(store, "recent_work", { tool: "Cursor", project_id: project.id }, { model: null });
+    expect(cursor.sessions.map((s: any) => s.title)).toEqual(["Login page wiring"]); // the 20-day-old one is left out
+  });
+});

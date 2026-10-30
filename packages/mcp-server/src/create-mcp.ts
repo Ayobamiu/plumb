@@ -66,7 +66,8 @@ function uriSlug(uri: string): string {
 const INSTRUCTIONS = `Plumb brings in context from the user's other AI tools, corrected for what changed since.
 When a message starts with /plumb, or the user refers to work done in another tool:
 1. If there are no words after /plumb, call list_projects, pick the project this work belongs to, and call get_project_state with its project_id. Say what changed (OUT, or May be out of date) with the one-line reason, then what is current. Stop.
-2. Otherwise call find_context with the user's words as typed, not keywords.
+2. If they ask about a span of time across sessions ("what did I build this week"), call recent_work and summarize. Stop.
+2b. Otherwise call find_context with the user's words as typed, not keywords.
 3. If the first why starts "Not a clear match", or there are no results, don't call get_context. Say it wasn't found and list any near misses with their why.
 4. If the first why starts "Basic search", the smart search is down: say so in one line, show the results and let the user pick.
 5. Otherwise call get_context on the first result, say in one line why it fits, and list the others in one line each.

@@ -32,6 +32,7 @@ import {
   type ExplainClaimInput,
   type FindContextInput,
   type GetContextInput,
+  type RecentWorkInput,
   type ExplainClaimOutput,
   type GetProjectStateInput,
   type GetProjectStateOutput,
@@ -45,7 +46,7 @@ import {
   type ResolveReviewOutput,
   type Transition,
 } from "@plumb/core";
-import { findContext, readContext } from "./contexts.js";
+import { findContext, readContext, recentWork } from "./contexts.js";
 import { ConflictError, type ClaimUpdate, type Store } from "./store.js";
 
 export class ToolError extends Error {
@@ -197,6 +198,10 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
 
     async get_context(input: z.infer<typeof GetContextInput>) {
       return readContext(store, input);
+    },
+
+    async recent_work(input: z.infer<typeof RecentWorkInput>) {
+      return recentWork(store, input);
     },
 
     async list_projects(): Promise<z.infer<typeof ListProjectsOutput>> {
