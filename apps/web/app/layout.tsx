@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Plumb",
-  description: "What stopped being true since you last looked, and why.",
+  description: "Context from your other AI tools, already corrected for what changed since.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
