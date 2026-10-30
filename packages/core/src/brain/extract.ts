@@ -335,3 +335,25 @@ export async function extractClaims(model: JsonModel, input: ExtractInput, model
     extracted_by,
   };
 }
+
+// Slide labels (Oct 30): a flag should point at the exact place. Plain code, no
+// prompt change: a claim from a doc takes the "Slide 3:" or "Section 2:" label of
+// the line it shares the most words with.
+const LABELED_LINE = /^\s*(?:#+\s*)?((?:slide|section)\s+\d+)\b/i;
+const wordsOf = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+
+export function placeLabel(claimText: string, docText: string): string | undefined {
+  const want = wordsOf(claimText);
+  if (want.size === 0 || LABELED_LINE.test(claimText)) return undefined;
+  let best: { label: string; score: number } | undefined;
+  let label: string | undefined;
+  for (const line of docText.split("\n")) {
+    const m = LABELED_LINE.exec(line);
+    if (m) label = m[1]!.replace(/^./, (c) => c.toUpperCase());
+    if (!label) continue;
+    const have = wordsOf(line);
+    const score = [...want].filter((w) => have.has(w)).length / want.size;
+    if (!best || score > best.score) best = { label, score };
+  }
+  return best && best.score >= 0.5 ? best.label : undefined;
+}

@@ -33,7 +33,11 @@ export const GetProjectStateInput = z.object({
   // decisions never go quiet. Default 7.
   quiet_after_days: z.number().int().min(1).max(365).optional(),
 });
-export const ChangedClaim = z.object({ claim: Claim, transition: Transition });
+export const ChangedClaim = z.object({
+  claim: Claim,
+  transition: Transition,
+  source_title: z.string().optional(), // where the claim was written, e.g. the deck (added Oct 30, Usman OK'd)
+});
 // Coverage (added Oct 28, Usman OK'd): per tool, when Plumb last saved
 // something from it, across all projects. stale: it has saved before, but not
 // lately (2 days for session tools and email; docs and notes never go stale).

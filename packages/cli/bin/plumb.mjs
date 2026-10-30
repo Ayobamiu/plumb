@@ -4,6 +4,8 @@
 //   plumb backfill          bring in past Claude Code and Cursor sessions (asks first)
 //   plumb import <zip>      bring in Claude chats from a claude.ai data export
 //   plumb status            when Plumb last saved each tool
+//   plumb save              save this folder's latest sessions now
+//   plumb stats             what Plumb has saved and caught
 //   plumb uninstall         remove Plumb from this computer
 //   plumb delete-account    delete your account and everything saved in it
 // Every text is stripped of secrets before it leaves this machine. Plumb reads
@@ -300,6 +302,30 @@ async function deleteAccount() {
   console.log(`Removed: ${uninstall().join("; ")}.`);
 }
 
+/** Save this folder's newest sessions now, instead of waiting for the next hook or the hourly sync. */
+async function saveNow() {
+  const config = need();
+  const here = repoRoot(process.cwd());
+  const all = [...listClaudeCodeSessions(), ...(await listCursorChats())];
+  const mine = all.filter((s) => (s.workspace ?? s.read().workspace) === here).sort((a, b) => String(b.modified_at).localeCompare(String(a.modified_at))).slice(0, 3);
+  if (!mine.length) return console.log(`No sessions found for ${here}.`);
+  await send(config, mine);
+}
+
+/** The numbers: what Plumb has saved and caught for this account. */
+async function stats() {
+  const config = need();
+  const { projects } = await post(config.api, "/tools/list_projects", {}, config.token);
+  const sum = (k) => projects.reduce((n, p) => n + (p.counts?.[k] ?? 0), 0);
+  const { sessions } = await post(config.api, "/tools/recent_work", { days: 90 }, config.token);
+  const tools = new Set(sessions.map((s) => s.tool));
+  console.log(`Projects: ${projects.length}`);
+  console.log(`Sessions in the last 90 days: ${sessions.length} (${[...tools].join(", ") || "none"}; the list shows up to 30)`);
+  console.log(`Claims still true: ${sum("IN")}`);
+  console.log(`Stopped being true: ${sum("OUT")}`);
+  console.log(`May be out of date: ${sum("REVIEW")}`);
+}
+
 // The bridge Claude Desktop launches: MCP over stdin and stdout on one side,
 // the Plumb server on the other. One JSON message per line, answered in order.
 async function mcpBridge() {
@@ -419,7 +445,7 @@ async function hookStart() {
   else if (note) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: note } }) + "\n");
 }
 
-const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, mcp: mcpBridge, hook, "hook-send": hookSend, "hook-start": hookStart };
+const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, mcp: mcpBridge, save: saveNow, stats, hook, "hook-send": hookSend, "hook-start": hookStart };
 const run = commands[cmd];
 if (run && !cmd.startsWith("hook") && cmd !== "mcp") {
   try {

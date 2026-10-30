@@ -116,7 +116,7 @@ describe("npx plumb-ai init, end to end", () => {
       await callTool(scoped, "resolve_review", { claim_id: rec.claims[0].id, action: "confirm_out" }, { model: null });
       const note = JSON.parse((await start(cwd)).out);
       expect(note.hookSpecificOutput.hookEventName).toBe("SessionStart");
-      expect(note.hookSpecificOutput.additionalContext).toContain("- No longer true: Deploy the login page Friday. Went OUT because you confirmed it is no longer true.");
+      expect(note.hookSpecificOutput.additionalContext).toContain("- No longer true (in \"Auth refactor\"): Deploy the login page Friday. Went OUT because you confirmed it is no longer true.");
       expect((await start(cwd)).out.trim()).toBe(""); // shown once, then quiet
 
       // Claude Desktop's side: MCP over stdin through the local bridge.

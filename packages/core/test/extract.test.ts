@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { placeLabel } from "../src/index.js";
 import { buildExtractMessage, checkExtraction, extractClaims, type ExtractInput, type JsonModel } from "../src/index.js";
 
 const input: ExtractInput = {
@@ -117,5 +118,17 @@ describe("extractClaims", () => {
     expect(seen.effort).toBe("medium");
     expect(buildExtractMessage(input)).toContain('c1 [status] Tests pass\n');
     expect(seen.user).toContain('thread_id t-loi: "LOI" with avery@northfield.edu');
+  });
+});
+
+describe("placeLabel", () => {
+  const deck = "# Deck\nSlide 3: Plumb shows changes on a live homepage feed.\nSlide 4: Any tool can ask Plumb where things stand.\n\n## Section 2\nPricing starts at ten dollars a month.";
+  it("finds the slide or section a claim came from, and leaves the rest alone", () => {
+    expect(placeLabel("Plumb shows changes on a homepage feed", deck)).toBe("Slide 3");
+    expect(placeLabel("Any tool can ask Plumb where things stand.", deck)).toBe("Slide 4");
+    expect(placeLabel("Pricing starts at ten dollars", deck)).toBe("Section 2");
+    expect(placeLabel("The launch moved to March", deck)).toBeUndefined();
+    expect(placeLabel("Slide 3: already labelled homepage feed", deck)).toBeUndefined();
+    expect(placeLabel("Plumb shows a feed", "No labels here. Plumb shows a feed.")).toBeUndefined();
   });
 });

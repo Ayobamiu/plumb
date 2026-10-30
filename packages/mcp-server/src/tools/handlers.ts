@@ -227,10 +227,14 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
       }
 
       const transitions = await store.loadTransitions({ since, to_statuses: ["OUT", "REVIEW"] });
-      const changed_since = transitions
-        .filter((t) => byId.has(t.claim_id))
-        .reverse() // newest first
-        .map((transition) => ({ claim: byId.get(transition.claim_id)!, transition }));
+      const changedRows = transitions.filter((t) => byId.has(t.claim_id)).reverse(); // newest first
+      const changedSources = await store.loadSources([...new Set(changedRows.map((t) => byId.get(t.claim_id)!.source_id))]);
+      const titleOf = new Map(changedSources.map((s) => [s.id, s.title]));
+      const changed_since = changedRows.map((transition) => {
+        const claim = byId.get(transition.claim_id)!;
+        const source_title = titleOf.get(claim.source_id);
+        return { claim, transition, ...(source_title && { source_title }) };
+      });
 
       const coverage = await toolCoverage(now);
       const markdown = renderProjectState({ project, in_claims, changed_since, quiet_claims, coverage }, { since, now });

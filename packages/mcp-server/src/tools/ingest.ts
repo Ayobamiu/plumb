@@ -16,6 +16,7 @@ import {
   indexSession,
   isGenericTitle,
   knownThreads,
+  placeLabel,
   type IngestInput,
   type IngestOutput,
   type JsonModel,
@@ -90,12 +91,17 @@ export async function ingest(
     summary: summary.slice(0, 1000),
   });
 
-  const recorded = result.claims.length
+  // A claim from a doc keeps its place ("Slide 3: ..."), so a flag can point at it.
+  const placed = source.kind !== "doc" ? result.claims : result.claims.map((c) => {
+    const place = placeLabel(c.text, input.text);
+    return place ? { ...c, text: `${place}: ${c.text}` } : c;
+  });
+  const recorded = placed.length
     ? await handlers.record_claims({
         project_id: project.id,
         source,
         extracted_by: result.extracted_by,
-        claims: result.claims,
+        claims: placed,
       })
     : { claims: [], reasons: [], id_map: {} };
   const sourceTitle = source.title ? `"${source.title}"` : `a ${source.kind.replace("_", " ")} note`;

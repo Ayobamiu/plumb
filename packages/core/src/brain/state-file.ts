@@ -25,7 +25,8 @@ const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `
 
 function changedLine(row: Changed, indent: string): string {
   const label = row.transition.to_status === "REVIEW" ? "May be out of date" : row.transition.to_status;
-  return `${indent}- ${label}: ${sentence(row.claim.text)} ${row.transition.explanation}`;
+  const where = row.source_title ? ` (in "${row.source_title}")` : "";
+  return `${indent}- ${label}${where}: ${sentence(row.claim.text)} ${row.transition.explanation}`;
 }
 
 /** Changed claims newest first, with chain falls nested under the claim that knocked them down. */
