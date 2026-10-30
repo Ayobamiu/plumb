@@ -52,6 +52,10 @@ export default function HomePage() {
         <ul>
           <li>Secrets (keys, tokens, passwords) are stripped before anything is sent.</li>
           <li>Plumb reads each session to write down what it decided and planned. It never stores the transcript.</li>
+          <li>
+            Plumb is built on Meta&apos;s Muse Spark. While Meta&apos;s service is unavailable to us, session text is
+            processed by OpenAI instead.
+          </li>
           <li>Your settings are merged, never replaced, and backed up first.</li>
           <li>
             Check what saved when: <code>npx plumb-ai status</code>

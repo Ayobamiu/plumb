@@ -194,6 +194,9 @@ describe("recent_work", () => {
     await ingest(store, model(extraction("Old cursor work")), { project_id: project.id, source: { kind: "cursor", external_id: "conv-old" }, text: "old", at: old });
     const week: any = await callTool(store, "recent_work", { tool: "claude code" }, { model: null });
     expect(week.sessions.map((s: any) => s.title)).toEqual(["Auth refactor: middleware done"]);
+    expect(week.total).toBe(1);
+    const limited: any = await callTool(store, "recent_work", { days: 365, limit: 1 }, { model: null });
+    expect([limited.sessions.length, limited.total > 1]).toEqual([1, true]);
     const cursor: any = await callTool(store, "recent_work", { tool: "Cursor", project_id: project.id }, { model: null });
     expect(cursor.sessions.map((s: any) => s.title)).toEqual(["Login page wiring"]); // the 20-day-old one is left out
   });

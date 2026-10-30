@@ -19,6 +19,9 @@ Other commands:
 - `npx plumb-ai backfill`: bring in past Claude Code and Cursor sessions (`--dry-run` to only count).
 - `npx plumb-ai import <export.zip>`: bring in Claude chats. Get the zip from claude.ai > Settings > Privacy > Export data.
 - `npx plumb-ai status`: when Plumb last saved each tool.
+- `npx plumb-ai save`: save this folder's latest sessions now.
+- `npx plumb-ai stats`: what Plumb has saved and caught.
+- `npx plumb-ai flags <doc>`: what Plumb flagged in one doc.
 - `npx plumb-ai uninstall`: remove Plumb from this computer. Your other hooks and settings stay.
 - `npx plumb-ai delete-account`: delete your account and everything saved in it, for good.
 

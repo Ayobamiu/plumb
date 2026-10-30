@@ -217,10 +217,11 @@ export const FindContextOutput = z.object({ contexts: z.array(ContextEntry) });
 // sessions, so it lists them by time instead of picking one. Plain code.
 export const RecentWorkInput = z.object({
   tool: z.string().optional(), // "Claude Code", "cursor", ...; every tool if left out
-  days: z.number().int().min(1).max(90).optional(), // default 7
+  days: z.number().int().min(1).max(3650).optional(), // default 7
   project_id: z.string().optional(),
+  limit: z.number().int().min(1).max(1000).optional(), // default 30
 });
-export const RecentWorkOutput = z.object({ since: Timestamp, sessions: z.array(ContextEntry) });
+export const RecentWorkOutput = z.object({ since: Timestamp, sessions: z.array(ContextEntry), total: z.number().int() });
 
 // A plain object (no .refine): MCP clients only see inputs they can describe,
 // and a refined schema showed up with no inputs at all. "One of the two" is

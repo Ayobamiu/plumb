@@ -255,11 +255,10 @@ export async function recentWork(store: Store, input: z.infer<typeof RecentWorkI
   const days = input.days ?? RECENT_DAYS;
   const since = new Date(Date.now() - days * DAY_MS).toISOString();
   const wanted = input.tool?.toLowerCase().replace(/[^a-z]/g, "");
-  const all = await listContexts(store, { ...(input.project_id && { project_id: input.project_id }), days, limit: 1000 });
-  const sessions = all
+  const all = await listContexts(store, { ...(input.project_id && { project_id: input.project_id }), days, limit: 10_000 });
+  const matched = all
     .filter((e) => Date.parse(e.last_at) >= Date.parse(since))
     .filter((e) => e.tool !== "Email")
-    .filter((e) => !wanted || e.tool.toLowerCase().replace(/[^a-z]/g, "").includes(wanted))
-    .slice(0, RECENT_LIMIT);
-  return { since, sessions };
+    .filter((e) => !wanted || e.tool.toLowerCase().replace(/[^a-z]/g, "").includes(wanted));
+  return { since, sessions: matched.slice(0, input.limit ?? RECENT_LIMIT), total: matched.length };
 }

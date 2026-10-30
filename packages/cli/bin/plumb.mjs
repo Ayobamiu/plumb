@@ -6,6 +6,7 @@
 //   plumb status            when Plumb last saved each tool
 //   plumb save              save this folder's latest sessions now
 //   plumb stats             what Plumb has saved and caught
+//   plumb flags <doc>       what Plumb flagged in one doc
 //   plumb uninstall         remove Plumb from this computer
 //   plumb delete-account    delete your account and everything saved in it
 // Every text is stripped of secrets before it leaves this machine. Plumb reads
@@ -320,18 +321,43 @@ async function saveNow() {
   await send(config, mine);
 }
 
-/** The numbers: what Plumb has saved and caught for this account. */
+/** The numbers: what Plumb has saved and caught for this account. Test projects don't count. */
 async function stats() {
   const config = need();
   const { projects } = await post(config.api, "/tools/list_projects", {}, config.token);
-  const sum = (k) => projects.reduce((n, p) => n + (p.counts?.[k] ?? 0), 0);
-  const { sessions } = await post(config.api, "/tools/recent_work", { days: 90 }, config.token);
-  const tools = new Set(sessions.map((s) => s.tool));
-  console.log(`Projects: ${projects.length}`);
-  console.log(`Sessions in the last 90 days: ${sessions.length} (${[...tools].join(", ") || "none"}; the list shows up to 30)`);
+  const real = projects.filter((p) => p.name !== "Smoke test" && !p.workspace?.startsWith("/tmp/"));
+  const sum = (k) => real.reduce((n, p) => n + (p.counts?.[k] ?? 0), 0);
+  const { sessions, total } = await post(config.api, "/tools/recent_work", { days: 3650, limit: 1000 }, config.token);
+  const byTool = {};
+  for (const s of sessions) byTool[s.tool] = (byTool[s.tool] ?? 0) + 1;
+  console.log(`Sessions saved: ${total} (${Object.entries(byTool).map(([t, n]) => `${t} ${n}`).join(", ") || "none"})`);
+  console.log(`Projects: ${real.length}`);
   console.log(`Claims still true: ${sum("IN")}`);
   console.log(`Stopped being true: ${sum("OUT")}`);
   console.log(`May be out of date: ${sum("REVIEW")}`);
+}
+
+/** What Plumb flagged in one doc: `plumb flags pitch deck`. */
+async function flags() {
+  const config = need();
+  const words = args.slice(1).filter((a) => !a.startsWith("--")).join(" ").toLowerCase();
+  if (!words) {
+    console.error("Usage: plumb flags <words from the doc's title>");
+    process.exit(1);
+  }
+  const { sessions } = await post(config.api, "/tools/recent_work", { tool: "doc", days: 3650, limit: 1000 }, config.token);
+  const docs = sessions.filter((s) => s.title?.toLowerCase().includes(words));
+  if (!docs.length) return console.log(`No doc matches "${words}".`);
+  let count = 0;
+  for (const doc of docs) {
+    const { markdown } = await post(config.api, "/tools/get_context", { uri: doc.uri }, config.token);
+    const parts = markdown.split(/^## /m).filter((p) => /^(No longer true|May be out of date)\n/.test(p));
+    const lines = parts.flatMap((p) => p.split("\n").filter((l) => l.startsWith("- ")));
+    count += lines.length;
+    console.log(`${doc.title}: ${lines.length} flagged`);
+    for (const l of lines) console.log(l.replace(/^- \[[a-z ]+\] /, "- "));
+  }
+  console.log(`\nPlumb caught ${count} thing${count === 1 ? "" : "s"} that stopped being true.`);
 }
 
 // The bridge Claude Desktop launches: MCP over stdin and stdout on one side,
@@ -453,7 +479,7 @@ async function hookStart() {
   else if (note) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: note } }) + "\n");
 }
 
-const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, mcp: mcpBridge, save: saveNow, stats, hook, "hook-send": hookSend, "hook-start": hookStart };
+const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, mcp: mcpBridge, save: saveNow, stats, flags, hook, "hook-send": hookSend, "hook-start": hookStart };
 const run = commands[cmd];
 if (run && !cmd.startsWith("hook") && cmd !== "mcp") {
   try {
@@ -463,7 +489,7 @@ if (run && !cmd.startsWith("hook") && cmd !== "mcp") {
   }
 }
 if (!run) {
-  console.log("Usage: plumb init | backfill [--tool claude-code|cursor] [--dry-run] [--yes] | import <zip> | status | uninstall | delete-account");
+  console.log("Usage: plumb init | backfill [--tool claude-code|cursor] [--dry-run] [--yes] | import <zip> | status | save | stats | flags <doc> | uninstall | delete-account");
   process.exit(cmd ? 1 : 0);
 }
 run().catch((err) => {
