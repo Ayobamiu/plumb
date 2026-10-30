@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
+import { hashToken } from "../src/auth.js";
 import { createHttpApp } from "../src/http.js";
 import { callTool, ingest, listContexts, MEMORY_USER, MemoryStore, ScopedStore } from "../src/tools/index.js";
 import type { JsonModel } from "@plumb/core";
@@ -117,5 +118,35 @@ describe("workspaces: users never pick projects", () => {
     expect(store.sources.find((s) => s.external_id === "s1")).toMatchObject({ project_id: aProject });
     expect(store.sources.find((s) => s.external_id === "s9")!.label).toBe("personal"); // extraction decides personal too
     await expect(ingest(a, extractor(false), { source: { kind: "cursor", external_id: "c2" }, text: "y" })).rejects.toMatchObject({ code: "bad_input" });
+  });
+});
+
+describe("delete my account", () => {
+  it("removes only the caller's rows; refused without confirm and for the owner", async () => {
+    await withServer(async (base, store) => {
+      const a = new ScopedStore(store, "user-a");
+      const b = new ScopedStore(store, "user-b");
+      const pa = store.addProject("A", "user-a");
+      const pb = store.addProject("B", "user-b");
+      const claim = (p: string) => ({ project_id: p, source: { kind: "cursor", external_id: "same-id" }, extracted_by: "t", claims: [{ text: "Ships Friday", kind: "status", valid_from: "2026-10-28T00:00:00Z", reasons: [until("2027-01-01T00:00:00Z")] }] });
+      await callTool(a, "record_claims", claim(pa.id), { model: null });
+      await callTool(b, "record_claims", claim(pb.id), { model: null });
+      const own = await store.createToken({ user_id: "user-a", tool: "cli", token_hash: hashToken("plumb_a") });
+      await store.createToken({ user_id: "user-b", tool: "cli", token_hash: hashToken("plumb_b") });
+      await store.createToken({ user_id: MEMORY_USER, tool: "cli", token_hash: hashToken("plumb_owner") });
+
+      expect((await post(base, "/auth/delete-account", {}, "plumb_a")).status).toBe(400); // no confirm
+      expect((await post(base, "/auth/delete-account", { confirm: "delete" })).status).toBe(401); // no token
+      expect((await post(base, "/auth/delete-account", { confirm: "delete" }, "plumb_owner")).status).toBe(403);
+
+      const res = await post(base, "/auth/delete-account", { confirm: "delete" }, "plumb_a");
+      expect(await res.json()).toEqual({ deleted: { projects: 1, sources: 1, claims: 1 } });
+      expect(store.projects.map((p) => p.user_id)).toEqual(["user-b"]);
+      expect(store.sources.map((s) => s.user_id)).toEqual(["user-b"]);
+      expect([...store.claims.values()].map((c) => c.project_id)).toEqual([pb.id]);
+      expect(store.reasons).toHaveLength(1);
+      expect(store.tokens.find((t) => t.id === own.id)).toBeUndefined();
+      expect((await post(base, "/tools/list_projects", {}, "plumb_a")).status).toBe(401); // the token is gone too
+    });
   });
 });

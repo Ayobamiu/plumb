@@ -4,6 +4,8 @@
 //   plumb backfill          bring in past Claude Code and Cursor sessions (asks first)
 //   plumb import <zip>      bring in Claude chats from a claude.ai data export
 //   plumb status            when Plumb last saved each tool
+//   plumb uninstall         remove Plumb from this computer
+//   plumb delete-account    delete your account and everything saved in it
 // Every text is stripped of secrets before it leaves this machine. Plumb reads
 // it to write down what the session decided and planned (claims with reasons),
 // a title and a summary; it never stores the transcript itself.
@@ -20,7 +22,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { post, PlumbError, saveSession } from "../lib/api.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
-import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, installSync, refreshApp } from "../lib/install.mjs";
+import { copyApp, hasClaudeCode, hasCursor, installClaudeCode, installCursor, installSync, refreshApp, uninstall } from "../lib/install.mjs";
 import { changeNote } from "../lib/note.mjs";
 import { scrub } from "../lib/scrub.mjs";
 import { listClaudeCodeSessions, readClaudeCodeTranscript, repoRoot } from "../lib/sources/claude-code.mjs";
@@ -270,6 +272,33 @@ async function status() {
   console.log(md.includes("## Saving from your tools") ? md.slice(md.indexOf("## Saving from your tools")) : "No coverage yet.");
 }
 
+async function removeFromComputer() {
+  if (!(await ask("Remove Plumb from this computer? Your saved data stays until you run delete-account."))) {
+    console.log("Nothing removed.");
+    return;
+  }
+  console.log(`Removed: ${uninstall().join("; ")}.`);
+  console.log("Restart Claude Code and Cursor. Your settings backups (*.plumb-backup) are still there.");
+}
+
+async function deleteAccount() {
+  const config = need();
+  console.log("This deletes your Plumb account and everything saved in it, for good, and removes Plumb from this computer.");
+  let confirmed = flag("--confirm");
+  if (!confirmed && process.stdin.isTTY) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    confirmed = (await rl.question('Type "delete" to confirm: ')).trim() === "delete";
+    rl.close();
+  }
+  if (!confirmed) {
+    console.log("Nothing deleted.");
+    return;
+  }
+  const { deleted } = await post(config.api, "/auth/delete-account", { confirm: "delete" }, config.token);
+  console.log(`Deleted ${deleted.sources} sessions, ${deleted.claims} claims and ${deleted.projects} projects.`);
+  console.log(`Removed: ${uninstall().join("; ")}.`);
+}
+
 // ---- hooks (run by Claude Code and Cursor; must never block or fail them) ----
 
 function hookLog(line) {
@@ -364,7 +393,7 @@ async function hookStart() {
   else if (note) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: note } }) + "\n");
 }
 
-const commands = { init, backfill, import: importExport, status, sync, hook, "hook-send": hookSend, "hook-start": hookStart };
+const commands = { init, backfill, import: importExport, status, sync, uninstall: removeFromComputer, "delete-account": deleteAccount, hook, "hook-send": hookSend, "hook-start": hookStart };
 const run = commands[cmd];
 if (run && !cmd.startsWith("hook")) {
   try {
@@ -374,7 +403,7 @@ if (run && !cmd.startsWith("hook")) {
   }
 }
 if (!run) {
-  console.log("Usage: plumb init | backfill [--tool claude-code|cursor] [--dry-run] [--yes] | import <zip> | status");
+  console.log("Usage: plumb init | backfill [--tool claude-code|cursor] [--dry-run] [--yes] | import <zip> | status | uninstall | delete-account");
   process.exit(cmd ? 1 : 0);
 }
 run().catch((err) => {

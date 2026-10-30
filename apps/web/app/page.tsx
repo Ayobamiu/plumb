@@ -22,7 +22,7 @@ export default function HomePage() {
           </li>
           <li>
             <p>
-              Your browser opens with a code. Sign in with your email and approve the code if it matches your terminal.
+              Your browser opens with a code. Sign in with GitHub and approve the code if it matches your terminal.
             </p>
           </li>
           <li>
@@ -55,6 +55,12 @@ export default function HomePage() {
           <li>Your settings are merged, never replaced, and backed up first.</li>
           <li>
             Check what saved when: <code>npx plumb-ai status</code>
+          </li>
+          <li>
+            Remove it from your computer: <code>npx plumb-ai uninstall</code>
+          </li>
+          <li>
+            Delete your account and everything saved in it: <code>npx plumb-ai delete-account</code>
           </li>
         </ul>
       </section>

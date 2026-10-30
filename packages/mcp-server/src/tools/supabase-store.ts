@@ -248,6 +248,14 @@ export class SupabaseStore implements Store, AuthStore {
     return error ? undefined : data.user?.id;
   }
 
+  async deleteUser(user_id: string) {
+    const { data, error } = await this.db.rpc("plumb_delete_user", { p_user: user_id });
+    if (error) throw new Error(`supabase: ${error.message}`);
+    const removed = await this.db.auth.admin.deleteUser(user_id);
+    if (removed.error) throw new Error(`supabase: ${removed.error.message}`);
+    return data as { projects: number; sources: number; claims: number };
+  }
+
   async findToken(token_hash: string): Promise<ApiToken | undefined> {
     const [row] = check(await this.db.from("api_tokens").select("id, user_id, tool, revoked_at").eq("token_hash", token_hash));
     return row && (clean(row) as unknown as ApiToken);

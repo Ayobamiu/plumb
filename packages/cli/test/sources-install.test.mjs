@@ -131,3 +131,26 @@ test("reads current Cursor's agent transcripts, finds the folder from the slug, 
   assert.equal(r.workspace, folder);
   assert.equal(r.text, "User:\nWhy did the self-serve signup fail?\n\nCursor:\nThe webhook secret was missing.");
 });
+
+test("uninstall removes only Plumb's entries and leaves everything else", async () => {
+  const { installClaudeCode, installCursor, installSync, copyApp, uninstall } = await import("../lib/install.mjs");
+  const cfg = { api: "https://plumb.example", token: "plumb_test" };
+  installClaudeCode(cfg);
+  installCursor(cfg);
+  installSync();
+  copyApp();
+  uninstall();
+  const s = JSON.parse(readFileSync(join(tmp, ".claude", "settings.json"), "utf8"));
+  assert.equal(s.theme, "dark");
+  assert.deepEqual(Object.keys(s.hooks), ["Stop"]); // their hook stays, ours are gone
+  assert.equal(s.hooks.Stop[0].hooks[0].command, "echo mine");
+  assert.equal(s.hooks.Stop.length, 1);
+  const m = JSON.parse(readFileSync(join(tmp, ".cursor", "mcp.json"), "utf8"));
+  assert.deepEqual(Object.keys(m.mcpServers), ["other"]);
+  const h = JSON.parse(readFileSync(join(tmp, ".cursor", "hooks.json"), "utf8"));
+  assert.deepEqual(h.hooks, {});
+  assert.ok(!existsSync(join(tmp, ".claude", "commands", "plumb.md")));
+  assert.ok(!existsSync(join(tmp, ".cursor", "commands", "plumb.md")));
+  assert.ok(!existsSync(process.env.PLUMB_HOME));
+  if (process.platform === "darwin") assert.ok(!existsSync(join(tmp, "Library", "LaunchAgents", "ai.plumb.sync.plist")));
+});

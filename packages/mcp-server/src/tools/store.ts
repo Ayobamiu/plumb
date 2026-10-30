@@ -104,6 +104,8 @@ export interface AuthStore {
   findDeviceLogin(by: { device_code_hash: string } | { user_code: string }): Promise<DeviceLogin | undefined>;
   /** Sets user_id and approved_at if still unapproved. False otherwise. */
   approveDeviceLogin(id: string, user_id: string, at: string): Promise<boolean>;
+  /** Delete my account (Oct 30): all of one user's rows and their sign-in. Counts what went. */
+  deleteUser(user_id: string): Promise<{ projects: number; sources: number; claims: number }>;
   /** Sets token_issued_at if not set yet. False if a token was already issued. */
   markDeviceTokenIssued(id: string, at: string): Promise<boolean>;
 }

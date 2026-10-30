@@ -3,7 +3,7 @@
 // session in index mode. Existing settings are merged, never replaced, and a
 // backup is written next to any file before the first change.
 import { execFileSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -153,4 +153,70 @@ export function installSync() {
   } catch {
     return [`hourly sync: written to ${plist}; load it with launchctl bootstrap ${domain} ${plist}`];
   }
+}
+
+// Undo everything init did. Only Plumb's own entries go: other hooks and MCP
+// servers stay, and files are rewritten, not removed, unless nothing else is left in them.
+function dropHooks(hooks) {
+  const hasOurs = (entry) => isOurs(entry.command, "hook") || isOurs(entry.command, "hook-start");
+  for (const [event, list] of Object.entries(hooks ?? {})) {
+    const kept = list.flatMap((entry) => {
+      if (!entry.hooks) return hasOurs(entry) ? [] : [entry]; // Cursor: flat { command }
+      const inner = entry.hooks.filter((h) => !hasOurs(h)); // Claude Code: grouped
+      return inner.length ? [{ ...entry, hooks: inner }] : [];
+    });
+    if (kept.length) hooks[event] = kept;
+    else delete hooks[event];
+  }
+}
+
+export function uninstall() {
+  const done = [];
+  const claudeSettings = join(homedir(), ".claude", "settings.json");
+  if (existsSync(claudeSettings)) {
+    const s = readJson(claudeSettings);
+    dropHooks(s.hooks);
+    if (s.hooks && Object.keys(s.hooks).length === 0) delete s.hooks;
+    writeFileSync(claudeSettings, JSON.stringify(s, null, 2) + "\n");
+    done.push("Claude Code hooks");
+  }
+  try {
+    execFileSync("claude", ["mcp", "remove", "--scope", "user", "plumb"], { stdio: "ignore" });
+    done.push("Claude Code MCP server");
+  } catch {
+    /* not there, or no claude command */
+  }
+  const cursorMcp = join(homedir(), ".cursor", "mcp.json");
+  if (existsSync(cursorMcp)) {
+    const m = readJson(cursorMcp);
+    if (m.mcpServers?.plumb) {
+      delete m.mcpServers.plumb;
+      writeFileSync(cursorMcp, JSON.stringify(m, null, 2) + "\n");
+      done.push("Cursor MCP server");
+    }
+  }
+  const cursorHooks = join(homedir(), ".cursor", "hooks.json");
+  if (existsSync(cursorHooks)) {
+    const h = readJson(cursorHooks);
+    dropHooks(h.hooks);
+    writeFileSync(cursorHooks, JSON.stringify(h, null, 2) + "\n");
+    done.push("Cursor hooks");
+  }
+  for (const dir of [join(homedir(), ".claude", "commands"), join(homedir(), ".cursor", "commands")]) rmSync(join(dir, "plumb.md"), { force: true });
+  done.push("/plumb");
+  const plist = join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
+  if (existsSync(plist)) {
+    if (!process.env.PLUMB_SKIP_LAUNCHCTL) {
+      try {
+        execFileSync("launchctl", ["bootout", `gui/${process.getuid?.() ?? ""}/${LABEL}`], { stdio: "ignore" });
+      } catch {
+        /* wasn't loaded */
+      }
+    }
+    rmSync(plist, { force: true });
+    done.push("hourly sync");
+  }
+  rmSync(home(), { recursive: true, force: true });
+  done.push("~/.plumb (your token and local state)");
+  return done;
 }

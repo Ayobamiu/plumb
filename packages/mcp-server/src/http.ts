@@ -90,7 +90,21 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
   app.post("/auth/device/token", safe(device.token));
 
   // Auth for every mutating / listing surface. Health stays open for the host.
-  app.use(["/mcp", "/tools", "/ingest", "/links", "/sweep"], requireBearer({ tokens, ownerUserId, auth: store, verifySession }));
+  app.use(["/mcp", "/tools", "/ingest", "/links", "/sweep", "/auth/delete-account"], requireBearer({ tokens, ownerUserId, auth: store, verifySession }));
+
+  // Delete my account (Oct 30): the caller's own rows, never anyone else's. The
+  // owner's account can't be deleted this way: the watchers and env tokens use it.
+  app.post("/auth/delete-account", safe(async (req, res) => {
+    if (req.body?.confirm !== "delete") {
+      res.status(400).json({ error: 'send { "confirm": "delete" }', code: "bad_input" });
+      return;
+    }
+    if (req.plumbUserId === ownerUserId) {
+      res.status(403).json({ error: "the owner account can't be deleted this way" });
+      return;
+    }
+    res.json({ deleted: await store.deleteUser(req.plumbUserId!) });
+  }));
 
   app.post("/tools/:name", async (req: Request, res: Response) => {
     const raw = req.params.name;

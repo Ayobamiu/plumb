@@ -44,6 +44,23 @@ export class MemoryStore implements Store, AuthStore {
     return this.addProject(name, user_id || MEMORY_USER, workspace);
   }
 
+  async deleteUser(user_id: string) {
+    const projects = new Set(this.projects.filter((p) => p.user_id === user_id).map((p) => p.id));
+    const sources = new Set(this.sources.filter((s) => s.user_id === user_id).map((s) => s.id));
+    const claims = new Set([...this.claims.values()].filter((c) => projects.has(c.project_id) || sources.has(c.source_id)).map((c) => c.id));
+    const counts = { projects: projects.size, sources: sources.size, claims: claims.size };
+    this.links = this.links.filter((l) => !projects.has(l.project_id));
+    this.transitions = this.transitions.filter((t) => !claims.has(t.claim_id));
+    this.reasons = this.reasons.filter((r) => !claims.has(r.claim_id));
+    for (const id of claims) this.claims.delete(id);
+    this.events = this.events.filter((e) => !sources.has(e.source_id));
+    this.sources = this.sources.filter((s) => !sources.has(s.id));
+    this.projects = this.projects.filter((p) => !projects.has(p.id));
+    this.tokens = this.tokens.filter((t) => t.user_id !== user_id);
+    this.devices = this.devices.filter((d) => d.user_id !== user_id);
+    return counts;
+  }
+
   async findToken(token_hash: string) {
     const t = this.tokens.find((x) => x.token_hash === token_hash);
     return t && { id: t.id, user_id: t.user_id, tool: t.tool, ...(t.revoked_at && { revoked_at: t.revoked_at }) };
