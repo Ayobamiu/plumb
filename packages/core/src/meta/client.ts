@@ -27,7 +27,17 @@ export const MUSE_SPARK = standIn
 // Oct 29: the key's model list flipped again (standard 1.3 gone, only the
 // contributor 1.3 listed). When the default model answers "not found", calls
 // fall back to the next standard model instead of failing. Never contributor.
-export const MUSE_SPARK_FALLBACKS = standIn ? [] : ["muse-spark-1.2", "muse-spark-1.1"].filter((m) => m !== MUSE_SPARK);
+// Contributor tier, only if Usman switches it on (Oct 29 evening: the key
+// listed only contributor models). It lets Meta train on what Plumb sends, so
+// it comes after every standard model: once standard models are back, they
+// answer first again. Off unless PLUMB_ALLOW_CONTRIBUTOR=1.
+export const ALLOW_CONTRIBUTOR = process.env.PLUMB_ALLOW_CONTRIBUTOR === "1";
+export const MUSE_SPARK_FALLBACKS = standIn
+  ? []
+  : [
+      ...["muse-spark-1.2", "muse-spark-1.1"].filter((m) => m !== MUSE_SPARK),
+    ];
+const CONTRIBUTOR_FALLBACKS = ALLOW_CONTRIBUTOR ? ["muse-spark-1.3-contributor", "muse-spark-1.2-contributor"] : [];
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -90,12 +100,15 @@ export class MetaClient {
     // "Not found" flaps call by call (Oct 27 and 29), sometimes for every model at
     // once: go through the chain again after each wait before giving up.
     for (let round = 0; ; round++) {
-      for (const model of chain) {
+      // Contributor models (if switched on) only in the last round, after standard failed every time.
+      const last = round === this.retryDelaysMs.length;
+      const models = last && chain.length > 1 ? [...chain, ...CONTRIBUTOR_FALLBACKS] : chain;
+      for (const model of models) {
         try {
           return await this.withRetries({ ...opts, model });
         } catch (err) {
           if (!(err instanceof ModelMissingError)) throw err;
-          if (round === this.retryDelaysMs.length && model === chain.at(-1)) throw err;
+          if (last && model === models.at(-1)) throw err;
         }
       }
       await new Promise((resolve) => setTimeout(resolve, this.retryDelaysMs[round]));
