@@ -74,7 +74,9 @@ export async function listContexts(
     const s = summary.get(e.source_id);
     if (!e.summary.startsWith("...") && (!s || Date.parse(e.occurred_at) > Date.parse(s.at))) summary.set(e.source_id, { at: e.occurred_at, text: e.summary });
   }
-  for (const c of claims) last.set(c.source_id, later(last.get(c.source_id), c.recorded_at)!);
+  // When it happened, not when it was saved: an old chat imported today is still
+  // old. Claims only date a source that has no events (Oct 30).
+  for (const c of claims) if (!last.has(c.source_id)) last.set(c.source_id, c.recorded_at);
   if (last.size === 0) return [];
 
   const sourceIds = [...last.keys()];

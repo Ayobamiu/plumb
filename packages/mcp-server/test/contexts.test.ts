@@ -187,6 +187,18 @@ describe("ingest: index mode", () => {
   });
 });
 
+describe("dates", () => {
+  it("an old session imported today keeps its real date, with claims or without", async () => {
+    const { store, project } = await setup();
+    const old = "2026-01-15T10:00:00.000Z";
+    await ingest(store, model(extraction("January plan", [newClaim("n1", "Ship in spring")])), { project_id: project.id, source: { kind: "claude_chat", external_id: "old-chat" }, text: "plan", at: old });
+    const [entry] = (await listContexts(store, { days: 365 })).filter((c) => c.title === "January plan");
+    expect(Date.parse(entry!.last_at)).toBe(Date.parse(old));
+    const week: any = await callTool(store, "recent_work", {}, { model: null });
+    expect(week.sessions.map((s: any) => s.title)).not.toContain("January plan");
+  });
+});
+
 describe("recent_work", () => {
   it("lists this week's sessions for a tool, not older ones or email", async () => {
     const { store, project } = await setup();

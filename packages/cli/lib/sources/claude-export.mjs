@@ -9,7 +9,8 @@ import { extname, join } from "node:path";
 function textOf(content) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content.map((p) => (typeof p === "string" ? p : typeof p?.text === "string" ? p.text : "")).filter(Boolean).join("\n");
+  // Only what was said: exports also hold thinking, tool calls and injected prompts.
+  return content.map((p) => (typeof p === "string" ? p : p?.type === "text" && typeof p.text === "string" ? p.text : "")).filter(Boolean).join("\n");
 }
 
 function find(dir, name) {

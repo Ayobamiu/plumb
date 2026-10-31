@@ -155,8 +155,8 @@ async function saveOne(config, state, s, read, { index = false } = {}) {
   const all = scrub(read.text);
   const h = hash(all);
   if (!read.turns) return false;
-  const sameMode = index ? prev?.mode !== "full" : prev?.mode === "full";
-  if (sameMode && prev?.hash === h) return false;
+  // Indexing never redoes a saved session; full mode upgrades an indexed one.
+  if ((index || prev?.mode === "full") && prev?.hash === h) return false;
   let text = all;
   if (!index) {
     const done = prev?.mode === "full" ? Math.min(prev.turns ?? 0, read.turns) : 0;
@@ -223,6 +223,25 @@ function summarize(groups) {
   }
 }
 
+// Claims only matter while work is current: sessions from the last 30 days are
+// read in full; older ones are indexed (title and summary), still findable by
+// description. --full-all reads everything in full, --index nothing.
+async function sendByAge(config, sessions, opts = {}) {
+  const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
+  const recent = sessions.filter((s) => !flag("--index") && (flag("--full-all") || Date.parse(s.modified_at ?? 0) >= cutoff));
+  const older = sessions.filter((s) => !recent.includes(s));
+  const totals = { sent: 0, failed: 0 };
+  for (const [list, index] of [[recent, false], [older, true]]) {
+    if (!list.length) continue;
+    if (index && recent.length && !opts.quiet) console.log(`  Older than ${RECENT_DAYS} days, indexed only:`);
+    const r = await send(config, list, { ...opts, index });
+    totals.sent += r.sent;
+    totals.failed += r.failed;
+    totals.stop ??= r.stop;
+  }
+  return totals;
+}
+
 async function backfill() {
   const config = need();
   const tool = opt("--tool");
@@ -238,17 +257,7 @@ async function backfill() {
     console.log(`Nothing sent. Run \`npx plumb-ai backfill\` when you're ready${process.stdin.isTTY ? "" : " (add --yes to skip the question)"}.\n`);
     return;
   }
-  // Claims only matter while work is current: sessions from the last 30 days are
-  // read in full; older ones are indexed (title and summary), still findable by
-  // description. --full-all reads everything in full, --index nothing.
-  const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
-  const recent = all.filter((s) => !flag("--index") && (flag("--full-all") || Date.parse(s.modified_at ?? 0) >= cutoff));
-  const older = all.filter((s) => !recent.includes(s));
-  if (recent.length) await send(config, recent);
-  if (older.length) {
-    if (recent.length) console.log(`  Older than ${RECENT_DAYS} days, indexed only:`);
-    await send(config, older, { index: true });
-  }
+  await sendByAge(config, all);
   console.log();
 }
 
@@ -257,7 +266,7 @@ async function sync() {
   const config = loadConfig();
   if (!config?.token) return;
   const sessions = [...listClaudeCodeSessions(), ...(await listCursorChats())];
-  const r = await send(config, sessions, { quiet: true });
+  const r = await sendByAge(config, sessions, { quiet: true });
   if (r.sent || r.failed) hookLog(`sync: saved ${r.sent}, failed ${r.failed}${r.stop ? ` (${r.stop})` : ""}`);
 }
 
@@ -272,7 +281,7 @@ async function importExport() {
   console.log("In this export:");
   summarize([["Claude chat", chats]]);
   if (!chats.length || flag("--dry-run") || !(await ask(`Bring in ${chats.length} chats now?`))) return;
-  await send(config, chats, { index: flag("--index") });
+  await sendByAge(config, chats);
 }
 
 async function status() {
