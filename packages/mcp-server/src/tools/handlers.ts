@@ -136,6 +136,24 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
     });
   }
 
+  /** Not an MCP tool (/ingest): a doc's slide was rewritten, so code closes its old claims. */
+  async function retire(items: { claim_id: string; explanation: string }[]): Promise<Transition[]> {
+    if (items.length === 0) return [];
+    return withRetry(async () => {
+      const ctx = context();
+      const state = await loadBrain(store);
+      const before = statuses(state);
+      const changes = items.flatMap((item) => {
+        if (!state.claims.has(item.claim_id)) return [];
+        const out = confirmOut(state, item.claim_id, ctx);
+        if (out[0]) out[0].transition.explanation = item.explanation;
+        return out;
+      });
+      if (changes.length) await store.apply({ updates: updatesFor(state, before, changes), transitions: changes.map((c) => c.transition) });
+      return changes.map((c) => c.transition);
+    });
+  }
+
   /** Not an MCP tool: send claims to REVIEW (Part C and /ingest). Never OUT. */
   async function review(items: ReviewItem[]): Promise<Transition[]> {
     if (items.length === 0) return [];
@@ -187,6 +205,7 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
 
   return {
     review,
+    retire,
     fade,
     mention,
     toolCoverage,

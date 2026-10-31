@@ -11,7 +11,9 @@
 // With index_only (Oct 28), only a title and summary are written: see indexOnly.
 import type { z } from "zod";
 import {
+  claimPlace,
   explainContradicted,
+  explainReplaced,
   extractClaims,
   indexSession,
   isGenericTitle,
@@ -111,6 +113,19 @@ export async function ingest(
 
   // Claims the text talked about, or added a reason to, are still in use.
   const sameAs = result.claims.flatMap((c) => (c.same_as ? [c.same_as] : []));
+
+  // A rewritten slide closes its old claims (Oct 31), so a fixed slide stops being
+  // flagged. Plain code: same doc, same "Slide 3" label, and the text didn't repeat it.
+  if (source.kind === "doc") {
+    const kept = new Set([...sameAs, ...result.mentions]);
+    const fresh = new Map(recorded.claims.flatMap((c) => { const p = claimPlace(c.text); return p ? [[p.toLowerCase(), c] as const] : []; }));
+    const older = claims.filter((c) => c.source_id === recordedEvent.event.source_id && c.status !== "OUT" && !kept.has(c.id));
+    await handlers.retire(older.flatMap((c) => {
+      const place = claimPlace(c.text);
+      const next = place && fresh.get(place.toLowerCase());
+      return next ? [{ claim_id: c.id, explanation: explainReplaced(place, next.text) }] : [];
+    }));
+  }
   await handlers.mention([...result.mentions, ...sameAs], input.at ?? now);
 
   // One line per ingest in the server log.

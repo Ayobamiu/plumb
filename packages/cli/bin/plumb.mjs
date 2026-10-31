@@ -357,16 +357,21 @@ async function flags() {
   const { sessions } = await post(config.api, "/tools/recent_work", { tool: "doc", days: 3650, limit: 1000 }, config.token);
   const docs = sessions.filter((s) => s.title?.toLowerCase().includes(words));
   if (!docs.length) return console.log(`No doc matches "${words}".`);
-  let count = 0;
+  let open = 0;
+  let fixed = 0;
   for (const doc of docs) {
     const { markdown } = await post(config.api, "/tools/get_context", { uri: doc.uri }, config.token);
-    const parts = markdown.split(/^## /m).filter((p) => /^(No longer true|May be out of date)\n/.test(p));
-    const lines = parts.flatMap((p) => p.split("\n").filter((l) => l.startsWith("- ")));
-    count += lines.length;
-    console.log(`${doc.title}: ${lines.length} flagged`);
-    for (const l of lines) console.log(l.replace(/^- \[[a-z ]+\] /, "- "));
+    const list = (heading) => (markdown.split(/^## /m).find((p) => p.startsWith(`${heading}\n`)) ?? "").split("\n").filter((l) => l.startsWith("- ")).map((l) => l.replace(/^- \[[a-z ]+\] /, "- "));
+    const flagged = list("May be out of date");
+    const closed = list("No longer true");
+    open += flagged.length;
+    fixed += closed.length;
+    console.log(`${doc.title}: ${flagged.length} to check, ${closed.length} fixed`);
+    for (const l of flagged) console.log(l);
+    for (const l of closed) console.log(l.replace(/^- /, "- Fixed: ").replace(/ Fixed: Slide/, " Slide"));
   }
-  console.log(`\nPlumb caught ${count} thing${count === 1 ? "" : "s"} that stopped being true.`);
+  const n = open + fixed;
+  console.log(`\nPlumb caught ${n} thing${n === 1 ? "" : "s"} that stopped being true.`);
 }
 
 // The bridge Claude Desktop launches: MCP over stdin and stdout on one side,

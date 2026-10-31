@@ -342,6 +342,10 @@ export async function extractClaims(model: JsonModel, input: ExtractInput, model
 const LABELED_LINE = /^\s*(?:#+\s*)?((?:slide|section)\s+\d+)\b/i;
 const wordsOf = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 3));
 
+/** "Slide 3" from "Slide 3: ...", or undefined. */
+export const claimPlace = (text: string) => LABELED_CLAIM.exec(text)?.[1];
+const LABELED_CLAIM = /^((?:slide|section)\s+\d+):/i;
+
 export function placeLabel(claimText: string, docText: string): string | undefined {
   const want = wordsOf(claimText);
   if (want.size === 0 || LABELED_LINE.test(claimText)) return undefined;

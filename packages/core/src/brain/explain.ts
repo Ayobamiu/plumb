@@ -100,6 +100,11 @@ export function explainFaded(days: number): string {
   return `Back IN: nothing confirmed the change within ${days} days.`;
 }
 
+/** A doc's slide or section was rewritten, so its old claim is closed (Oct 31). */
+export function explainReplaced(place: string, newText: string): string {
+  return `Fixed: ${place} now says "${newText.replace(/^(?:slide|section)\s+\d+:\s*/i, "")}"`;
+}
+
 export function explainConfirmedOut(): string {
   return "Went OUT because you confirmed it is no longer true.";
 }

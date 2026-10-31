@@ -150,3 +150,24 @@ describe("delete my account", () => {
     });
   });
 });
+
+describe("a fixed slide stops being flagged", () => {
+  it("closes the rewritten slide's old claim, keeps the slides that didn't change, and still counts it", async () => {
+    const store = new MemoryStore();
+    const answer = (claims: any[], same: string[] = []): JsonModel => ({
+      async json(opts) {
+        return opts.parse.parse({ claims: [...claims, ...same.map((id) => ({ ref: id, text: "x", kind: "fact", valid_from: null, confidence: 1, same_as: id, reasons: [] }))].map((c) => c), contradicts: [], summary: "Deck.", mentions: same, title: "Deck", personal: false }) as never;
+      },
+    });
+    const c = (ref: string, text: string) => ({ ref, text, kind: "fact", valid_from: null, confidence: 1, same_as: null, reasons: [{ type: "until", event_kind: null, from: null, thread_id: null, text_hint: null, since: null, at: "2027-01-01T00:00:00Z", claim_ref: null }] });
+    const a = new ScopedStore(store, "user-a");
+    const doc = { kind: "doc" as const, external_id: "deck", title: "Deck" };
+    await ingest(a, answer([c("n1", "Sign in with your email"), c("n2", "Any tool can ask Plumb")]), { workspace: "/w", source: doc, text: "Slide 1: Sign in with your email\nSlide 2: Any tool can ask Plumb" });
+    const [slide1, slide2] = [...store.claims.values()];
+    await ingest(a, answer([c("n1", "Sign in with GitHub")], [slide2!.id]), { workspace: "/w", source: doc, text: "Slide 1: Sign in with GitHub\nSlide 2: Any tool can ask Plumb" });
+    expect(store.claims.get(slide1!.id)!.status).toBe("OUT");
+    expect(store.claims.get(slide2!.id)!.status).toBe("IN");
+    const t = store.transitions.find((x) => x.claim_id === slide1!.id && x.to_status === "OUT")!;
+    expect(t.explanation).toBe('Fixed: Slide 1 now says "Sign in with GitHub"');
+  });
+});
