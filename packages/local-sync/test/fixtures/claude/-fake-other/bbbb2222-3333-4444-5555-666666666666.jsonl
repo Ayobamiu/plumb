@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Plan the trip"},"cwd":"/fake/other","sessionId":"bbbb2222-3333-4444-5555-666666666666"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Here is a plan"}]},"cwd":"/fake/other","sessionId":"bbbb2222-3333-4444-5555-666666666666"}

@@ -43,10 +43,12 @@ const versionOf = (dir) => {
   }
 };
 
-/** After an update (npx plumb-ai@latest ...), the hooks' copy follows. Only if hooks were installed. */
+/** After an update (npx plumb-ai@latest ...), the hooks' copy and the sync job follow. Only if hooks were installed. */
 export function refreshApp() {
   const installed = versionOf(appDir());
-  if (installed && installed !== versionOf(pkgDir)) copyApp();
+  if (!installed || installed === versionOf(pkgDir)) return;
+  copyApp();
+  if (existsSync(syncPlist())) installSync();
 }
 
 function writeCommand(dir) {
@@ -140,17 +142,19 @@ export const hasClaudeCode = () => existsSync(join(homedir(), ".claude"));
 export const hasCursor = () => existsSync(join(homedir(), ".cursor"));
 
 // The safety net (Oct 29): hooks are the fast path, but Cursor sometimes skips
-// them and a crashed session never ends. Every hour, `plumb sync` rescans the
-// local history and saves whatever changed. macOS: a launchd job; elsewhere,
+// them and a crashed session never ends. Every 15 minutes, `plumb sync` rescans
+// the local history and saves whatever changed. macOS: a launchd job; elsewhere,
 // the line to add to cron.
 const LABEL = "ai.plumb.sync";
+const SYNC_MINUTES = 15;
+const syncPlist = () => join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
 
 export function installSync() {
   const command = [process.execPath, join(appDir(), "bin", "plumb.mjs"), "sync"];
   if (process.platform !== "darwin") {
-    return [`hourly sync: add this to crontab -e: 0 * * * * ${command.map((c) => `"${c}"`).join(" ")}`];
+    return [`${SYNC_MINUTES}-minute sync: add this to crontab -e: */${SYNC_MINUTES} * * * * ${command.map((c) => `"${c}"`).join(" ")}`];
   }
-  const plist = join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
+  const plist = syncPlist();
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -158,7 +162,7 @@ export function installSync() {
   <key>Label</key><string>${LABEL}</string>
   <key>ProgramArguments</key>
   <array>${command.map((c) => `<string>${c}</string>`).join("")}</array>
-  <key>StartInterval</key><integer>3600</integer>
+  <key>StartInterval</key><integer>${SYNC_MINUTES * 60}</integer>
   <key>StandardOutPath</key><string>${join(home(), "sync.log")}</string>
   <key>StandardErrorPath</key><string>${join(home(), "sync.log")}</string>
 </dict>
@@ -166,7 +170,7 @@ export function installSync() {
 `;
   mkdirSync(dirname(plist), { recursive: true });
   writeFileSync(plist, xml);
-  if (process.env.PLUMB_SKIP_LAUNCHCTL) return ["hourly sync (launchd, not loaded in tests)"];
+  if (process.env.PLUMB_SKIP_LAUNCHCTL) return [`${SYNC_MINUTES}-minute sync (launchd, not loaded in tests)`];
   const domain = `gui/${process.getuid?.() ?? ""}`;
   try {
     execFileSync("launchctl", ["bootout", `${domain}/${LABEL}`], { stdio: "ignore" });
@@ -175,9 +179,9 @@ export function installSync() {
   }
   try {
     execFileSync("launchctl", ["bootstrap", domain, plist], { stdio: "ignore" });
-    return ["hourly sync (launchd)"];
+    return [`${SYNC_MINUTES}-minute sync (launchd)`];
   } catch {
-    return [`hourly sync: written to ${plist}; load it with launchctl bootstrap ${domain} ${plist}`];
+    return [`${SYNC_MINUTES}-minute sync: written to ${plist}; load it with launchctl bootstrap ${domain} ${plist}`];
   }
 }
 
@@ -239,7 +243,7 @@ export function uninstall() {
   }
   for (const dir of [join(homedir(), ".claude", "commands"), join(homedir(), ".cursor", "commands")]) rmSync(join(dir, "plumb.md"), { force: true });
   done.push("/plumb");
-  const plist = join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`);
+  const plist = syncPlist();
   if (existsSync(plist)) {
     if (!process.env.PLUMB_SKIP_LAUNCHCTL) {
       try {
@@ -249,7 +253,7 @@ export function uninstall() {
       }
     }
     rmSync(plist, { force: true });
-    done.push("hourly sync");
+    done.push("background sync");
   }
   rmSync(home(), { recursive: true, force: true });
   done.push("~/.plumb (your token and local state)");

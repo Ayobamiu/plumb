@@ -1,0 +1,5 @@
+{"record_type":"event","payload_type":"runtime.user_intent.accepted","payload":{"model_messages":[{"content":[{"kind":"text","text":"Review the auth diff"}]}]}}
+{"record_type":"event","payload_type":"runtime.session","payload":{"kind":"run","event":{"kind":"assistant_message_committed","text":"Auth looks good"}}}
+{"record_type":"event","payload_type":"runtime.session","payload":{"kind":"run","event":{"kind":"assistant_tool_calls_committed","tool_calls":[]}}}
+{"record_type":"event","payload_type":"session.workspace_branch.observed","payload":{"record":{"workspace_root":"/fake/plumb"}}}
+not json

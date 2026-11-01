@@ -17,7 +17,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/integrations/claude-code/hooks/stop.mjs\"",
-            "timeout": 60
+            "timeout": 90
           }
         ]
       }
@@ -28,7 +28,7 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/integrations/claude-code/hooks/session-end.mjs\"",
-            "timeout": 30
+            "timeout": 90
           }
         ]
       }

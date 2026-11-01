@@ -4,9 +4,12 @@
  *
  * Cursor rules (from Claude Code's migration notes):
  * - First run: store users.getProfile historyId, do not replay old mail.
- * - Advance the cursor only after every message on the page was recorded.
+ * - Advance the cursor only after every message on the page was recorded
+ *   (or skipped as missing/trash/draft).
  * - historyId 404 (~week old): reset to profile historyId and log it.
+ * - message 404: skip and keep going so one deleted id cannot stall the cursor.
  */
+import { fileURLToPath } from "node:url";
 import { getCursor, getGmailRefreshToken, setCursor } from "./lib/supabase.js";
 import { recordEvent } from "./lib/record-event.js";
 import {
@@ -93,7 +96,15 @@ async function processSince(access: string, startHistoryId: string): Promise<str
         const id = item.message.id;
         if (seen.has(id)) continue;
         seen.add(id);
-        const meta = await getMessageMeta(access, id);
+        const got = await getMessageMeta(access, id);
+        if (got.status === 404) {
+          console.warn(`skip missing message id=${id} (404)`);
+          continue;
+        }
+        if (got.status !== 200 || !got.data) {
+          throw new Error(`gmail message ${id} HTTP ${got.status}: ${(got.body ?? "").slice(0, 200)}`);
+        }
+        const meta = got.data;
         // Skip drafts / trash noise.
         const labels = meta.labelIds ?? [];
         if (labels.includes("DRAFT") || labels.includes("TRASH")) continue;
@@ -143,13 +154,12 @@ async function tick(refreshToken: string): Promise<void> {
   }
 }
 
-async function main(): Promise<void> {
+export async function startGmail(): Promise<void> {
   const refresh = await getGmailRefreshToken();
   if (!refresh) {
-    console.error(
+    throw new Error(
       "No Gmail refresh token in Vault. Visit http://localhost:3000/api/gmail/auth while pnpm dev:web is running, then retry.",
     );
-    process.exit(1);
   }
 
   console.log(`gmail watcher polling every ${POLL_MS / 1000}s`);
@@ -163,7 +173,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  startGmail().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

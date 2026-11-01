@@ -1,0 +1,5 @@
+{"type":"mode","mode":"accept","sessionId":"aaaa1111-2222-3333-4444-555555555555"}
+{"type":"user","message":{"role":"user","content":"Check the login page"},"cwd":"/fake/plumb","sessionId":"aaaa1111-2222-3333-4444-555555555555"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Login looks fine"}],"model":"fake"},"cwd":"/fake/plumb","sessionId":"aaaa1111-2222-3333-4444-555555555555"}
+{"type":"custom-title","customTitle":"Login check","sessionId":"aaaa1111-2222-3333-4444-555555555555"}
+not json

@@ -2,6 +2,8 @@
  * POST text to Plumb /ingest. Hooks must send text, never a local file path
  * (the server runs remotely and cannot read your disk).
  */
+import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { apiBase, projectId } from "./plumb-env.mjs";
 
 const MAX_CHARS = 180_000;
@@ -12,19 +14,44 @@ export async function ingestText({
   externalId,
   title,
   token,
+  indexOnly = false,
+  label,
+  projectId: projectIdOverride,
 }) {
   const trimmed = String(text ?? "").trim();
   if (!trimmed) return { skipped: true, reason: "empty" };
 
+  const source = {
+    kind: sourceKind,
+    external_id: String(externalId).slice(0, 200),
+  };
+  // Omit title when the hook has none, so /ingest keeps Muse Spark's generated title.
+  if (title && String(title).trim()) {
+    source.title = String(title).trim().slice(0, 200);
+  }
+  if (label === "personal") source.label = "personal";
   const body = {
-    project_id: projectId(),
-    source: {
-      kind: sourceKind,
-      external_id: String(externalId).slice(0, 200),
-      title: title ? String(title).slice(0, 200) : undefined,
-    },
+    source,
     text: trimmed.length > MAX_CHARS ? trimmed.slice(-MAX_CHARS) : trimmed,
   };
+  // Full extraction needs a project. Index mode may omit it (personal / unknown).
+  if (indexOnly) {
+    body.index_only = true;
+    const pid =
+      projectIdOverride !== undefined
+        ? projectIdOverride
+        : (() => {
+            try {
+              return projectId();
+            } catch {
+              return undefined;
+            }
+          })();
+    if (pid) body.project_id = pid;
+  } else {
+    body.project_id =
+      projectIdOverride !== undefined ? projectIdOverride : projectId();
+  }
 
   const res = await fetch(`${apiBase()}/ingest`, {
     method: "POST",
@@ -77,8 +104,11 @@ export async function getProjectState(token, since) {
   return json;
 }
 
-/** Plain text summary for SessionStart / additional_context. */
+/** Plain text summary for SessionStart / additional_context (fallback). */
 export function formatProjectState(state) {
+  if (typeof state?.markdown === "string" && state.markdown.trim()) {
+    return state.markdown.trimEnd() + "\n";
+  }
   const lines = [`# Plumb project state: ${state.project?.name ?? "?"}`];
   const inClaims = state.in_claims ?? {};
   for (const kind of Object.keys(inClaims).sort()) {
@@ -98,5 +128,13 @@ export function formatProjectState(state) {
     }
   }
   if (state.summary) lines.push(`## summary\n${state.summary}`);
-  return lines.join("\n");
+  return lines.join("\n") + "\n";
+}
+
+/** Write get_project_state.markdown (or the fallback) to PROJECT_STATE.md. */
+export function writeProjectStateFile(state, dir) {
+  const md = formatProjectState(state);
+  const path = resolve(dir, "PROJECT_STATE.md");
+  writeFileSync(path, md, "utf8");
+  return path;
 }

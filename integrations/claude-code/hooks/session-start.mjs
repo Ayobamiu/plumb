@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 /**
- * SessionStart: print get_project_state as plain text so Claude Code adds it
- * to context (stdout on SessionStart becomes context).
+ * SessionStart: write PROJECT_STATE.md from state.markdown, then print it so
+ * Claude Code adds it to context (stdout on SessionStart becomes context).
  */
-import { loadRootEnv } from "../../lib/plumb-env.mjs";
-import { formatProjectState, getProjectState } from "../../lib/ingest.mjs";
+import { loadRootEnv, repoRoot } from "../../lib/plumb-env.mjs";
+import {
+  formatProjectState,
+  getProjectState,
+  writeProjectStateFile,
+} from "../../lib/ingest.mjs";
 
 loadRootEnv();
 
@@ -16,6 +20,15 @@ try {
   const token = process.env.PLUMB_TOKEN_CLAUDE_CODE || process.env.PLUMB_MCP_TOKEN;
   if (!token) throw new Error("PLUMB_TOKEN_CLAUDE_CODE is not set");
   const state = await getProjectState(token);
+  const dir = process.env.CLAUDE_PROJECT_DIR || repoRoot();
+  try {
+    writeProjectStateFile(state, dir);
+  } catch (err) {
+    console.error(
+      "plumb SessionStart: could not write PROJECT_STATE.md:",
+      err instanceof Error ? err.message : err,
+    );
+  }
   process.stdout.write(formatProjectState(state));
 } catch (err) {
   process.stdout.write(

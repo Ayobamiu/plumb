@@ -2,6 +2,7 @@
  * Clock job every minute: emit a clock event so until-reasons can break.
  * record_event only persists the tick when something actually changes.
  */
+import { fileURLToPath } from "node:url";
 import { recordEvent } from "./lib/record-event.js";
 
 const INTERVAL_MS = 60_000;
@@ -25,7 +26,7 @@ async function tick(): Promise<void> {
   );
 }
 
-async function main(): Promise<void> {
+export async function startClock(): Promise<void> {
   console.log(`clock watcher every ${INTERVAL_MS / 1000}s`);
   for (;;) {
     try {
@@ -37,7 +38,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  startClock().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

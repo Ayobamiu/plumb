@@ -88,12 +88,16 @@ export type MessageMeta = {
   payload?: { headers?: Array<{ name: string; value: string }> };
 };
 
-export async function getMessageMeta(accessToken: string, id: string): Promise<MessageMeta> {
+/** Fetch message metadata. Returns status 404 when the message is gone. */
+export async function getMessageMeta(
+  accessToken: string,
+  id: string,
+): Promise<{ status: number; data?: MessageMeta; body?: string }> {
   // Repeated metadataHeaders: Subject + From. Avoid URLSearchParams (it collapses dup keys).
   const path = `/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`;
   const r = await gmailGet<MessageMeta>(accessToken, path);
-  if (!r.ok) throw new Error(`gmail message ${id} HTTP ${r.status}: ${r.body.slice(0, 200)}`);
-  return r.data;
+  if (!r.ok) return { status: r.status, body: r.body };
+  return { status: 200, data: r.data };
 }
 
 export function header(msg: MessageMeta, name: string): string | undefined {

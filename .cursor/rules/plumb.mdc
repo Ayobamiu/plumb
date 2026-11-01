@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Plumb: handoff for Cursor
 
-Plumb keeps one shared set of truths that all of Usman's AI tools (Claude Code, Cursor, Claude chat) read from and write to, and keeps it correct on its own. Every claim is stored with the reasons it holds. When new evidence (an email, a doc edit, time passing) breaks a reason, plain code marks the claim OUT and follows the chain to every claim built on it.
+Plumb keeps one shared set of truths that all of Usman's AI tools (Claude Code, Cursor, Muse Code, Claude chat) read from and write to, and keeps it correct on its own. Every claim is stored with the reasons it holds. When new evidence (an email, a doc edit, time passing) breaks a reason, plain code marks the claim OUT and follows the chain to every claim built on it.
 
 Built for the Meta Global AI Developer Hackathon. Submission due Nov 4, 2026, 9 PM ET.
 
@@ -22,22 +22,29 @@ If the doc and this file disagree, the doc wins.
 
 ## Your role
 
-- apps/web: the homepage in tab 6. One page: "what stopped being true since I last looked, and why?" Live updates from Supabase realtime on the transitions table.
-- packages/watchers: Gmail polling every 60 seconds (gmail.readonly), the doc watcher, the clock job. Each one calls record_event.
-- integrations/: Claude Code hooks (SessionStart, SessionEnd, Stop), Cursor hooks (afterAgentResponse, stop) and the rules file, Claude chat connector setup.
-- Auth: Gmail OAuth in testing mode, refresh token encrypted in Supabase Vault, one bearer token per tool for the MCP server.
-- Deploy: host the MCP server on a public URL early (target day 2).
+| Path | What |
+| --- | --- |
+| apps/web | Homepage (tab 6): what stopped being true, and why |
+| packages/watchers | Gmail, doc, clock, sweep |
+| packages/mcp-server deploy and auth | Railway deploy, bearer tokens |
+| integrations/claude-code, cursor, lib, claude-chat | Hooks, sync helpers, Claude chat setup |
 
-Claude Code owns packages/core, packages/mcp-server/src/tools, supabase/migrations, prompts/ and evals/. Don't edit those. If you need something from them, write it under "Blocked or needs" in the Progress log and continue with something else.
+Others own:
 
-## Start order
+| Path | Owner |
+| --- | --- |
+| packages/core, packages/mcp-server/src/tools, prompts/, evals/, supabase/migrations | Claude Code |
+| packages/local-sync, integrations/muse-code, .agents/skills/plumb | Muse Code |
 
-Claude Code goes first on day 1: repo layout, types, database. Wait for its first Progress log entry before writing code outside apps/web. Until then you can scaffold apps/web only.
+Don't edit Claude Code or Muse Code folders. If you need something from them, write it under "Blocked or needs" in the Progress log and continue with something else.
+
+Auth: Gmail OAuth in testing mode, refresh token encrypted in Supabase Vault, one bearer token per tool for the MCP server. Deploy: host the MCP server on a public URL.
 
 ## Known risks
 
 - Cursor hooks: some outputs reportedly don't reach the model, and lifecycle hooks don't run in Cloud Agents. Run locally, and use hooks only to send data out.
 - Hook formats change. Check current docs before building.
+- Claude.ai export download links require sign-in; import from a downloaded file, not from Gmail alone.
 
 ## Rules
 

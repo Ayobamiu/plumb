@@ -86,13 +86,13 @@ test("an update refreshes the hooks' copy; nothing happens if hooks were never i
   assert.notEqual(JSON.parse(readFileSync(pkgPath, "utf8")).version, "0.0.1");
 });
 
-test("the hourly sync job is written to run plumb sync from the stable copy", async () => {
+test("the 15-minute sync job is written to run plumb sync from the stable copy", async () => {
   process.env.PLUMB_SKIP_LAUNCHCTL = "1";
   const { installSync } = await import("../lib/install.mjs");
   const out = installSync();
   if (process.platform === "darwin") {
     const plist = readFileSync(join(tmp, "Library", "LaunchAgents", "ai.plumb.sync.plist"), "utf8");
-    assert.match(plist, /<integer>3600<\/integer>/);
+    assert.match(plist, /<integer>900<\/integer>/);
     assert.match(plist, /\.plumb\/app\/bin\/plumb\.mjs<\/string><string>sync<\/string>/);
   } else assert.match(out[0], /crontab/);
 });

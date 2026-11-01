@@ -17,6 +17,19 @@ Do not put the bearer token in git. Copy it from `.env` or Railway `mcp` variabl
 
 Claude chat has no custom slash commands, so `/plumb` is a convention here, not a real command. Paste `plumb-instructions.md` into the project's custom instructions. After that, typing `/plumb <query>` behaves the same as the Cursor command and the Muse skill: `find_context` then `get_context`, or `get_project_state` when the query is empty.
 
+## Import a Claude.ai export (index mode)
+
+Anthropic emails a download link after Settings → Privacy → Export data. That link **requires you to be signed in** (official docs). A Gmail watcher cannot fetch it unattended.
+
+1. Open the link in a signed-in browser and save the zip.
+2. From the repo root:
+
+```bash
+node integrations/claude-chat/import-export.mjs ~/Downloads/data-….zip
+```
+
+Each conversation is sent to `/ingest` with `index_only: true` (cheap title + summary, no claim extraction). Use `--dry` to list without writing, `--limit N` to cap.
+
 ## Check
 
 ```bash

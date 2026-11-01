@@ -261,7 +261,7 @@ async function backfill() {
   console.log();
 }
 
-/** The hourly safety net: save whatever changed in local history, without asking. */
+/** The 15-minute safety net: save whatever changed in local history, without asking. */
 async function sync() {
   const config = loadConfig();
   if (!config?.token) return;
@@ -320,7 +320,7 @@ async function deleteAccount() {
   console.log(`Removed: ${uninstall().join("; ")}.`);
 }
 
-/** Save this folder's newest sessions now, instead of waiting for the next hook or the hourly sync. */
+/** Save this folder's newest sessions now, instead of waiting for the next hook or the next sync. */
 async function saveNow() {
   const config = need();
   const here = repoRoot(process.cwd());

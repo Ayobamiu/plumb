@@ -7,6 +7,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gmail": "tsx --env-file=../../.env src/gmail.ts",
     "clock": "tsx --env-file=../../.env src/clock.ts",
+    "docs": "tsx --env-file=../../.env src/docs.ts",
+    "worker": "tsx --env-file=../../.env src/worker.ts",
     "check:gmail": "tsx --env-file=../../.env src/check-gmail-ready.ts"
   },
   "dependencies": {

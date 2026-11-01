@@ -16,8 +16,14 @@
     "stop": [
       {
         "command": "node integrations/cursor/hooks/stop.mjs",
-        "timeout": 30,
+        "timeout": 60,
         "loop_limit": 0
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "node integrations/cursor/hooks/stop.mjs",
+        "timeout": 60
       }
     ]
   }

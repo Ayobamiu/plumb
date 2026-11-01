@@ -18,6 +18,7 @@ dist/
 # Local
 .DS_Store
 *.log
+PROJECT_STATE.md
 
 # Meta call cost log
 logs/
