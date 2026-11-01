@@ -1,3 +1,4 @@
+import type { JsonModel } from "@plumb/core";
 import { describe, expect, it } from "vitest";
 import { callTool, ConflictError, MemoryStore, ToolError, type Store } from "../src/tools/index.js";
 
@@ -100,6 +101,26 @@ describe("record_event", () => {
     expect(out.transitions).toHaveLength(1);
     expect(store.events).toHaveLength(1);
     expect(status(out.transitions[0].claim_id)).toBe("OUT");
+  });
+
+  it("records a replayed email once and skips the model check", async () => {
+    const { store, project, call } = setup();
+    await seed(call, project.id);
+    let modelCalls = 0;
+    const model = {
+      json: async () => {
+        modelCalls++;
+        return { conflicts: false, unclear: false, evidence_quote: "" };
+      },
+    } as unknown as JsonModel;
+    const send = () => callTool(store, "record_event", { ...reply(), thread_id: "t2" }, { model });
+    await send();
+    const paid = modelCalls;
+    expect(paid).toBeGreaterThan(0);
+    await send();
+    await send();
+    expect(store.events).toHaveLength(1);
+    expect(modelCalls).toBe(paid);
   });
 
   it("retries when another run changed a claim first", async () => {

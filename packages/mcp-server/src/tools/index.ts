@@ -64,7 +64,7 @@ export function isToolName(name: string): name is ToolName {
 // record_event runs the Part C model check when a model is available. Left
 // out, the model comes from META_MODEL_API_KEY if set; pass null to turn it off.
 function defaultModel(): JsonModel | undefined {
-  return process.env.META_MODEL_API_KEY || process.env.PLUMB_MODEL_API_KEY ? new MetaClient() : undefined;
+  return process.env.META_MODEL_API_KEY ? new MetaClient() : undefined;
 }
 
 export async function callTool(

@@ -6,12 +6,6 @@ import type { z } from "zod";
 
 export const META_BASE_URL = "https://api.meta.ai/v1";
 
-// Stand-in provider (Usman, Oct 29), until Meta's standard models come back:
-// Meta's API is OpenAI-compatible, so another Responses API can stand in.
-// Set all three to use it; with none set, everything is Meta as before.
-//   PLUMB_MODEL_BASE_URL=https://api.openai.com/v1  PLUMB_MODEL_API_KEY=...  PLUMB_MODEL_ID=gpt-5.4-nano
-const standIn = process.env.PLUMB_MODEL_BASE_URL?.trim() ? process.env.PLUMB_MODEL_BASE_URL.trim().replace(/\/$/, "") : undefined;
-export const MODEL_BASE_URL = standIn ?? META_BASE_URL;
 // Default muse-spark-1.3. Override with META_MODEL_ID when this key's /v1/models list flips
 // (seen Oct 27: sometimes only *-contributor, sometimes only standard).
 // Never the contributor tier: it lets Meta train on our prompts, which carry
@@ -19,11 +13,7 @@ export const MODEL_BASE_URL = standIn ?? META_BASE_URL;
 // contributor id in META_MODEL_ID is ignored; if the standard model is
 // unavailable, calls fail and /ingest asks the caller to retry later.
 const configured = process.env.META_MODEL_ID?.trim();
-export const MUSE_SPARK = standIn
-  ? process.env.PLUMB_MODEL_ID?.trim() || "gpt-5.4-nano"
-  : configured && !/contributor/i.test(configured)
-    ? configured
-    : "muse-spark-1.3";
+export const MUSE_SPARK = configured && !/contributor/i.test(configured) ? configured : "muse-spark-1.3";
 // Oct 29: the key's model list flipped again (standard 1.3 gone, only the
 // contributor 1.3 listed). When the default model answers "not found", calls
 // fall back to the next standard model instead of failing. Never contributor.
@@ -32,11 +22,7 @@ export const MUSE_SPARK = standIn
 // it comes after every standard model: once standard models are back, they
 // answer first again. Off unless PLUMB_ALLOW_CONTRIBUTOR=1.
 export const ALLOW_CONTRIBUTOR = process.env.PLUMB_ALLOW_CONTRIBUTOR === "1";
-export const MUSE_SPARK_FALLBACKS = standIn
-  ? []
-  : [
-      ...["muse-spark-1.2", "muse-spark-1.1"].filter((m) => m !== MUSE_SPARK),
-    ];
+export const MUSE_SPARK_FALLBACKS = ["muse-spark-1.2", "muse-spark-1.1"].filter((m) => m !== MUSE_SPARK);
 const CONTRIBUTOR_FALLBACKS = ALLOW_CONTRIBUTOR ? ["muse-spark-1.3-contributor", "muse-spark-1.2-contributor"] : [];
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
@@ -88,10 +74,10 @@ class ModelMissingError extends TransientError {}
 
 export class MetaClient {
   constructor(
-    private apiKey = standIn ? process.env.PLUMB_MODEL_API_KEY : process.env.META_MODEL_API_KEY,
+    private apiKey = process.env.META_MODEL_API_KEY,
     private retryDelaysMs: number[] = [1000, 3000], // waits before the 2nd and 3rd attempts
   ) {
-    if (!this.apiKey) throw new Error(standIn ? "PLUMB_MODEL_API_KEY is not set" : "META_MODEL_API_KEY is not set");
+    if (!this.apiKey) throw new Error("META_MODEL_API_KEY is not set");
   }
 
   async json<T>(opts: JsonCallOptions<T>): Promise<T> {
@@ -130,8 +116,7 @@ export class MetaClient {
   /** One request, one log line. */
   private async attempt<T>(opts: JsonCallOptions<T>): Promise<T> {
     const model = opts.model ?? MUSE_SPARK;
-    // OpenAI's gpt-5.4 models take none/low/medium/high/xhigh, not "minimal".
-    const effort = standIn && opts.effort === "minimal" ? "low" : (opts.effort ?? "low");
+    const effort = opts.effort ?? "low";
     const started = Date.now();
     const log: MetaCallLog = {
       at: new Date().toISOString(),
@@ -149,7 +134,7 @@ export class MetaClient {
     try {
       let res: Response;
       try {
-        res = await fetch(`${MODEL_BASE_URL}/responses`, {
+        res = await fetch(`${META_BASE_URL}/responses`, {
           method: "POST",
           headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({

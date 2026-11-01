@@ -84,6 +84,15 @@ async function eventsFor(store: Store, reasons: Reason[]): Promise<Event[]> {
   return store.loadEvents({ kinds, after });
 }
 
+/** The stored copy of an email we have seen before. Only emails: other kinds can legitimately repeat. */
+async function alreadyRecorded(store: Store, input: z.infer<typeof RecordEventInput>): Promise<Event | undefined> {
+  if (input.kind !== "email_received" && input.kind !== "email_sent") return undefined;
+  const source = await store.upsertSource(input.source);
+  const seen = await store.loadEvents({ kinds: [input.kind], source_ids: [source.id] });
+  const at = Date.parse(input.occurred_at);
+  return seen.find((e) => Date.parse(e.occurred_at) === at && e.summary === input.summary);
+}
+
 const statuses = (state: BrainState) => new Map([...state.claims].map(([id, c]) => [id, c.status]));
 
 /** Status changes to stored claims, each with the status it was computed from. */
@@ -308,6 +317,11 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
     },
 
     async record_event(input: z.infer<typeof RecordEventInput>): Promise<z.infer<typeof RecordEventOutput>> {
+      // A watcher that crashes mid-page sends the same mail again on its next
+      // poll. That must not add a row or pay for model checks a second time.
+      const replayed = await alreadyRecorded(store, input);
+      if (replayed) return { event: replayed, transitions: [] };
+
       const partB = await withRetry(async () => {
         const ctx = context();
         const source = await store.upsertSource(input.source);

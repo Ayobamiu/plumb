@@ -170,7 +170,7 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
       return;
     }
     try {
-      if (!process.env.META_MODEL_API_KEY?.trim() && !process.env.PLUMB_MODEL_API_KEY?.trim()) {
+      if (!process.env.META_MODEL_API_KEY?.trim()) {
         res.status(503).json({ error: "META_MODEL_API_KEY is not set", code: "bad_input" });
         return;
       }

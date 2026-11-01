@@ -117,8 +117,8 @@ export default function HomePage() {
           <li>Secrets like keys, tokens and passwords are stripped before anything is sent.</li>
           <li>Plumb reads each session to write down what it decided and planned. It never stores the transcript.</li>
           <li>
-            Plumb is built on Meta&apos;s Muse Spark. While Meta&apos;s service is unavailable to us, session text is processed by
-            OpenAI instead.
+            Plumb runs on Meta&apos;s Muse Spark. If Meta&apos;s standard models are down, session text goes to its contributor
+            tier, which lets Meta train on what it receives.
           </li>
           <li>Your settings are merged, never replaced, and backed up first.</li>
         </ul>

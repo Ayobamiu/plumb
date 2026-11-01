@@ -307,7 +307,8 @@ export class SupabaseStore implements Store, AuthStore {
       })),
       p_transitions: write.transitions,
     });
-    if (error?.code === "40001") throw new ConflictError(error.message);
+    // PT409, never 40001: PostgREST retries 40001 forever on the server.
+    if (error?.code === "PT409") throw new ConflictError(error.message);
     if (error) throw new Error(`supabase: ${error.message}`);
   }
 }
