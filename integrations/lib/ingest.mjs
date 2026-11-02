@@ -17,6 +17,7 @@ export async function ingestText({
   indexOnly = false,
   label,
   projectId: projectIdOverride,
+  at,
 }) {
   const trimmed = String(text ?? "").trim();
   if (!trimmed) return { skipped: true, reason: "empty" };
@@ -34,6 +35,8 @@ export async function ingestText({
     source,
     text: trimmed.length > MAX_CHARS ? trimmed.slice(-MAX_CHARS) : trimmed,
   };
+  // When the text was written, for past sessions. Without it the server uses now.
+  if (at) body.at = at;
   // Full extraction needs a project. Index mode may omit it (personal / unknown).
   if (indexOnly) {
     body.index_only = true;

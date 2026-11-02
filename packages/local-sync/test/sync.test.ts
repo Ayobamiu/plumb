@@ -101,6 +101,8 @@ describe("runSync", () => {
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls[0]![0]).toMatchObject({ sourceKind: "muse_code", indexOnly: false });
     expect(send.mock.calls[1]![0]).toMatchObject({ sourceKind: "muse_code", indexOnly: true });
+    // Each session carries its file's own time, so an old one isn't saved as new.
+    expect(Date.parse(send.mock.calls[0]![0].at)).not.toBeNaN();
     expect(coverage[0]).toMatchObject({ sent: 2, failed: 0 });
     expect(Object.keys(loadState(statePath).sessions)).toHaveLength(2);
   });

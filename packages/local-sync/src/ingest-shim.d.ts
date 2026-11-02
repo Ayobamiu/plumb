@@ -10,5 +10,6 @@ declare module "*integrations/lib/ingest.mjs" {
     indexOnly?: boolean;
     label?: string;
     projectId?: string;
+    at?: string;
   }): Promise<unknown>;
 }

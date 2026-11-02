@@ -8,6 +8,7 @@
  * Dry run sends nothing and prints titles and sizes only, never the text.
  */
 import { execSync } from "node:child_process";
+import { statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +71,8 @@ export interface PlanEntry {
   hash: string;
   mode: "full" | "index";
   action: "send" | "unchanged" | "empty";
+  /** When the session last changed, so an old session isn't saved as new. */
+  at: string;
 }
 
 function readSession(session: LocalSession): { text: string; turns: number; title?: string; workdir?: string } {
@@ -121,6 +124,7 @@ export function planSessions(
         hash,
         mode: isPlumbSession(session, workdir, repoRoot) ? "full" : "index",
         action,
+        at: statSync(session.file).mtime.toISOString(),
       });
     }
   }
@@ -204,6 +208,7 @@ export async function runSync(opts: RunOptions): Promise<{ coverage: ToolCoverag
         ...(entry.session.title && { title: entry.session.title }),
         token: tokenFor(entry.session.tool, opts.tokens)!,
         indexOnly: entry.mode === "index",
+        at: entry.at,
       });
       cov.sent += 1;
       // Advance only after a 2xx.
