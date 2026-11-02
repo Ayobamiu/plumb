@@ -111,6 +111,35 @@ describe("ingest", () => {
     expect(store.claims.get(id)!.status).toBe("REVIEW");
   });
 
+  it("an old session saved late can't flag a claim written after it, but still flags older ones", async () => {
+    const store = new MemoryStore();
+    const project = store.addProject("p");
+    const recorded: any = await callTool(store, "record_claims", {
+      project_id: project.id,
+      source: { kind: "claude_code", external_id: "s0" },
+      extracted_by: "t",
+      claims: [
+        { text: "Production runs on the standard model", kind: "status", valid_from: "2026-11-02T00:00:00Z", reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] },
+        { text: "Tests pass", kind: "status", valid_from: "2026-10-20T00:00:00Z", reasons: [{ type: "until", at: "2027-01-01T00:00:00Z" }] },
+      ],
+    });
+    const [newer, older] = recorded.claims;
+
+    const out = await ingest(
+      store,
+      fakeModel({ claims: [], contradicts: [{ ref: "c1", quote: "still on contributor." }, { ref: "c2", quote: "the build broke." }] }),
+      {
+        project_id: project.id,
+        source: { kind: "muse_code", external_id: "old", title: "Old session" },
+        text: "We are still on contributor. Also the build broke.",
+        at: "2026-10-30T00:00:00Z",
+      },
+    );
+    expect(out.review.map((t: any) => t.claim_id)).toEqual([older.id]);
+    expect(store.claims.get(newer.id)!.status).toBe("IN");
+    expect(store.claims.get(older.id)!.status).toBe("REVIEW");
+  });
+
   it("keeps the end of very long text and says so", async () => {
     const store = new MemoryStore();
     const project = store.addProject("p");

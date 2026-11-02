@@ -107,8 +107,14 @@ export async function ingest(
       })
     : { claims: [], reasons: [], id_map: {} };
   const sourceTitle = source.title ? `"${source.title}"` : `a ${source.kind.replace("_", " ")} note`;
+  // Same rule as the model check: a claim was written knowing about anything
+  // before it, so an old session saved late can't flag a newer claim.
+  const textAt = Date.parse(input.at ?? now);
+  const validFrom = new Map(claims.map((c) => [c.id, Date.parse(c.valid_from)]));
   const review = await handlers.review(
-    result.contradicts.map((c) => ({ claim_id: c.claim_id, explanation: explainContradicted(sourceTitle, c.quote) })),
+    result.contradicts
+      .filter((c) => !(textAt <= (validFrom.get(c.claim_id) ?? -Infinity)))
+      .map((c) => ({ claim_id: c.claim_id, explanation: explainContradicted(sourceTitle, c.quote) })),
   );
 
   // Claims the text talked about, or added a reason to, are still in use.
