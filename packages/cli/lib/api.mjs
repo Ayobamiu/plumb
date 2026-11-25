@@ -36,10 +36,9 @@ export function excerpt(text) {
 const FULL_CHARS = 180_000; // full mode reads the most recent 200k characters at most
 
 /**
- * Save one session. Full mode (the default, Oct 29): Plumb writes down what the
- * session decided and planned, so it can tell later what stopped being true.
- * Index mode: only a title, a summary and personal or work. The workspace (the
- * folder it ran in, or "chats") picks the project.
+ * Save one session. Pull-first (Nov 24): callers usually pass index=true for a
+ * title, summary and personal/work. Full mode still extracts claims when opted
+ * in (PLUMB_FULL_EXTRACT or --full-all). Workspace picks the project.
  */
 export function saveSession(config, { kind, external_id, title, text, at, workspace, index }) {
   const body = {

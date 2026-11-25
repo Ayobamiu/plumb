@@ -29,6 +29,7 @@ import {
   type AuthStore,
   type Store,
 } from "./tools/index.js";
+import { shouldIndexOnly, sweepEnabled } from "./pull-first.js";
 
 export interface HttpOptions {
   store?: Store & AuthStore;
@@ -39,6 +40,15 @@ export interface HttpOptions {
   model?: JsonModel; // tests; the real server uses Muse Spark (META_MODEL_API_KEY)
   /** Host for DNS-rebinding checks; use 0.0.0.0 in deploy. */
   host?: string;
+}
+
+/** Legacy cost pause: blocks the sleep-time sweep only. Ingest stays on (index). */
+function extractionPaused(now = Date.now()): boolean {
+  if (process.env.PLUMB_PAUSE_EXTRACTION === "1") return true;
+  if (process.env.PLUMB_PAUSE_EXTRACTION === "0") return false;
+  const until = process.env.PLUMB_PAUSE_UNTIL?.trim() || "2026-11-10T00:00:00.000Z";
+  const t = Date.parse(until);
+  return Number.isFinite(t) && now < t;
 }
 
 function statusFor(err: ToolError): number {
@@ -127,8 +137,21 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
       res.status(400).json({ error: parsed.error.message, code: "bad_input" });
       return;
     }
+    // Pull-first: tool sessions index by default (title + summary). Full claim
+    // extract only when PLUMB_FULL_EXTRACT=1 or the project is allowlisted.
+    let data = parsed.data;
+    if (shouldIndexOnly(data)) {
+      data = { ...data, index_only: true };
+      console.log(
+        JSON.stringify({
+          ingest_pull_first: true,
+          kind: data.source.kind,
+          external_id: data.source.external_id,
+        }),
+      );
+    }
     try {
-      const result = await ingest(scoped(req), opts.model ?? new MetaClient(), parsed.data);
+      const result = await ingest(scoped(req), opts.model ?? new MetaClient(), data);
       res.json(result);
     } catch (err) {
       sendToolError(res, err);
@@ -167,6 +190,23 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
     // Every user's projects: only the owner's watchers may start it.
     if (req.plumbTool !== "watchers") {
       res.status(403).json({ error: "only the watchers token can run the sweep" });
+      return;
+    }
+    // Pull-first: sweep (what changed) is opt-in via PLUMB_ENABLE_SWEEP=1.
+    // Legacy pause also keeps it off.
+    if (!sweepEnabled() || extractionPaused()) {
+      console.log(JSON.stringify({ sweep_pause: true, enabled: sweepEnabled(), paused: extractionPaused() }));
+      res.json({
+        since: new Date().toISOString(),
+        until: new Date().toISOString(),
+        rechecked: 0,
+        events: 0,
+        transitions: [],
+        faded: [],
+        links: 0,
+        expired: 0,
+        paused: true,
+      });
       return;
     }
     try {

@@ -19,9 +19,24 @@ const seen: string[] = [];
 const model: JsonModel = {
   async json(opts) {
     seen.push(opts.user);
-    if (opts.schemaName === "claims") {
-      const gym = opts.user.includes("gym");
-      return opts.parse.parse({ claims: [], contradicts: [], mentions: [], title: gym ? "Gym week plan" : "Auth refactor", summary: gym ? "A push pull legs week." : "Tokens per tool.", personal: gym }) as never;
+    // Pull-first: backfill indexes by default (schema "index").
+    if (opts.schemaName === "index" || opts.schemaName === "claims") {
+      const gym = opts.user.toLowerCase().includes("gym");
+      if (opts.schemaName === "index") {
+        return opts.parse.parse({
+          title: gym ? "Gym week plan" : "Auth refactor",
+          summary: gym ? "A push pull legs week." : "Tokens per tool.",
+          personal: gym,
+        }) as never;
+      }
+      return opts.parse.parse({
+        claims: [],
+        contradicts: [],
+        mentions: [],
+        title: gym ? "Gym week plan" : "Auth refactor",
+        summary: gym ? "A push pull legs week." : "Tokens per tool.",
+        personal: gym,
+      }) as never;
     }
     if (opts.schemaName === "search") {
       const id = /\[([^\]]+)\][^\n]*\n  title: Gym week plan/.exec(opts.user)![1];
@@ -77,7 +92,7 @@ describe("npx plumb-ai init, end to end", () => {
       expect(init.out).toContain("Claude Code: hooks in ~/.claude/settings.json");
       expect(init.out).toContain("saved 2");
 
-      // Saved for the new user only, in full mode, in the project for the folder, with the secret gone before it left.
+      // Saved for the new user only, indexed (pull-first), in the project for the folder, with the secret gone before it left.
       const mine = store.sources.filter((s) => s.user_id === "user-new");
       expect(mine.map((s) => [s.external_id, s.title, s.label]).sort()).toEqual([["s-auth", "Auth refactor", undefined], ["s-gym", "Gym week plan", "personal"]]);
       expect(store.projects.filter((p) => p.user_id === "user-new").map((p) => [p.name, p.workspace]).sort()).toEqual([["My work", undefined], ["repo", join(home, "repo")]]);
@@ -90,14 +105,13 @@ describe("npx plumb-ai init, end to end", () => {
       const again = await run(["backfill", "--yes"], env);
       expect(again.out).toContain("saved 0, unchanged or empty 2");
 
-      // A session that grew sends only its new turns, marked as a continuation.
+      // A session that grew is re-indexed (whole text); pull-first does not do full-mode turn deltas.
       appendFileSync(join(proj, "s-auth.jsonl"), JSON.stringify({ cwd, timestamp: "2026-10-22T10:00:00Z", message: { role: "assistant", content: "Done: the login page now uses per-tool tokens." } }) + "\n");
       const grew = await run(["backfill", "--yes"], env);
       expect(grew.out).toContain("saved 1, unchanged or empty 1");
       const last = seen.at(-1)!;
-      expect(last).toContain("This continues a session already saved");
       expect(last).toContain("Done: the login page now uses per-tool tokens.");
-      expect(last).not.toContain("Refactor auth to one token per tool");
+      expect(last).toContain("Refactor auth to one token per tool");
 
       // init again (after an update) keeps the working token: no new sign-in.
       const devicesBefore = store.devices.length;

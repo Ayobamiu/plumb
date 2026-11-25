@@ -88,16 +88,17 @@ describe("record_event", () => {
 
   it("stores clock ticks only when they change something", async () => {
     const { store, project, call, status } = setup();
+    // Until must be in the future at record time, or the claim starts OUT before any tick.
     await call("record_claims", {
       project_id: project.id,
       source: session,
       extracted_by: "t",
-      claims: [{ temp_id: "live", text: "Hackathon is live", kind: "status", valid_from: since, reasons: [{ type: "until", at: "2026-11-05T01:00:00Z" }] }],
+      claims: [{ temp_id: "live", text: "Hackathon is live", kind: "status", valid_from: since, reasons: [{ type: "until", at: "2027-06-01T01:00:00Z" }] }],
     });
     const tick = (at: string) => ({ kind: "clock", source: { kind: "manual", external_id: "clock" }, occurred_at: at, summary: "tick" });
-    await call("record_event", tick("2026-11-04T12:00:00Z"));
+    await call("record_event", tick("2027-05-31T12:00:00Z"));
     expect(store.events).toHaveLength(0);
-    const out = await call("record_event", tick("2026-11-05T01:01:00Z"));
+    const out = await call("record_event", tick("2027-06-01T01:01:00Z"));
     expect(out.transitions).toHaveLength(1);
     expect(store.events).toHaveLength(1);
     expect(status(out.transitions[0].claim_id)).toBe("OUT");
@@ -147,7 +148,7 @@ describe("get_project_state and explain_claim", () => {
       project_id: project.id,
       source: session,
       extracted_by: "t",
-      claims: [{ text: "Demo is Nov 4", kind: "fact", valid_from: since, reasons: [{ type: "until", at: "2026-11-05T01:00:00Z" }] }],
+      claims: [{ text: "Demo is Nov 4", kind: "fact", valid_from: since, reasons: [{ type: "until", at: "2027-12-01T01:00:00Z" }] }],
     });
     const state = await call("get_project_state", { project_id: project.id, since: "2026-01-01T00:00:00Z" });
     expect(state.in_claims.fact.map((c: any) => c.text)).toEqual(["Demo is Nov 4"]);
