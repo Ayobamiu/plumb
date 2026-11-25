@@ -14,9 +14,13 @@ import {
   type AuthStore,
   type DeviceLogin,
   type ReasonFilter,
+  type SourceHit,
+  type SourceListFilter,
+  type SourceSearchFilter,
   type Store,
   type TransitionFilter,
 } from "./store.js";
+import { claimsEnabled } from "../claims.js";
 
 type Row = Record<string, unknown>;
 type Result = { data: unknown; error: { message: string; code?: string } | null };
@@ -24,6 +28,8 @@ type Result = { data: unknown; error: { message: string; code?: string } | null 
 const PAGE = 1000; // PostgREST's default row cap
 const CHUNK = 100; // ids per in() filter, to keep URLs short
 const DEVICE_COLUMNS = "id, user_code, tool, user_id, expires_at, approved_at, token_issued_at";
+// Everything a list or search row needs; digest (up to 20k chars) only on a single read.
+const SOURCE_LIST = "id, kind, external_id, uri, title, label, project_id, user_id, summary, last_at";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Postgres nulls become missing fields, matching the optional fields in the Contract.
@@ -78,6 +84,8 @@ export class SupabaseStore implements Store, AuthStore {
 
   async listProjects(): Promise<ProjectWithCounts[]> {
     const projects = check(await this.db.from("projects").select("*").order("created_at"));
+    // Claims suspended: counting them is a full table scan nobody reads.
+    if (!claimsEnabled()) return projects.map((row) => ({ ...toProject(row), counts: { IN: 0, OUT: 0, REVIEW: 0 } }));
     const statuses = await pages((a, b) => this.db.from("claims").select("id, project_id, status").order("id").range(a, b));
     return projects.map((row) => {
       const counts = { IN: 0, OUT: 0, REVIEW: 0 };
@@ -110,6 +118,49 @@ export class SupabaseStore implements Store, AuthStore {
     if (!UUID.test(id)) return undefined;
     const [row] = check(await this.db.from("sources").select("*").eq("id", id));
     return row && toSource(row);
+  }
+
+  async findSource(user_id: string, kind: Source["kind"], external_id: string) {
+    if (!UUID.test(user_id)) return undefined;
+    const [row] = check(await this.db.from("sources").select("*").eq("user_id", user_id).eq("kind", kind).eq("external_id", external_id));
+    return row && toSource(row);
+  }
+
+  async listSources(filter: SourceListFilter): Promise<Source[]> {
+    if (!UUID.test(filter.user_id)) return [];
+    let q = this.db
+      .from("sources")
+      .select(SOURCE_LIST)
+      .eq("user_id", filter.user_id)
+      .not("external_id", "in", "(clock,usman-links)")
+      .not("external_id", "like", "smoke-%")
+      .not("last_at", "is", null);
+    if (filter.since) q = q.gte("last_at", filter.since);
+    if (filter.kinds?.length) q = q.in("kind", filter.kinds);
+    if (filter.project_id) {
+      if (!UUID.test(filter.project_id)) return [];
+      q = q.or(`project_id.eq.${filter.project_id},kind.eq.doc`);
+    }
+    const rows = check(await q.order("last_at", { ascending: false }).limit(Math.min(filter.limit ?? 30, 1000)));
+    return rows.map(toSource);
+  }
+
+  async searchSources(filter: SourceSearchFilter): Promise<SourceHit[]> {
+    if (!UUID.test(filter.user_id) || filter.words.length === 0) return [];
+    if (filter.project_id && !UUID.test(filter.project_id)) return [];
+    const { data, error } = await this.db.rpc("plumb_search_sources", {
+      p_user: filter.user_id,
+      p_words: filter.words.join(" "),
+      p_kinds: filter.kinds?.length ? filter.kinds : null,
+      p_since: filter.since ?? null,
+      p_project: filter.project_id ?? null,
+      p_limit: filter.limit ?? 10,
+    });
+    if (error) throw new Error(`supabase: ${error.message}`);
+    return ((data as Row[] | null) ?? []).map((row) => {
+      const { rank, ...rest } = row;
+      return { ...toSource(rest), rank: Number(rank) };
+    });
   }
 
   async loadSources(ids: string[]) {

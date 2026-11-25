@@ -13,3 +13,5 @@ export * from "./brain/context.js";
 export * from "./brain/search.js";
 export * from "./brain/index-session.js";
 export * from "./brain/coverage.js";
+export * from "./brain/local-index.js";
+export * from "./brain/session-view.js";

@@ -11,6 +11,9 @@ import type {
   NewLinkSuggestion,
   ProjectWithCounts,
   ReasonFilter,
+  SourceHit,
+  SourceListFilter,
+  SourceSearchFilter,
   Store,
   TransitionFilter,
 } from "./store.js";
@@ -60,6 +63,19 @@ export class ScopedStore implements Store {
   async getSource(id: string): Promise<Source | undefined> {
     const s = await this.inner.getSource(id);
     return s?.user_id === this.userId ? s : undefined;
+  }
+
+  // A caller-sent user_id never wins here either.
+  findSource(_userId: string, kind: Source["kind"], external_id: string): Promise<Source | undefined> {
+    return this.inner.findSource(this.userId, kind, external_id);
+  }
+
+  listSources(filter: Omit<SourceListFilter, "user_id"> & { user_id?: string }): Promise<Source[]> {
+    return this.inner.listSources({ ...filter, user_id: this.userId });
+  }
+
+  searchSources(filter: Omit<SourceSearchFilter, "user_id"> & { user_id?: string }): Promise<SourceHit[]> {
+    return this.inner.searchSources({ ...filter, user_id: this.userId });
   }
 
   async loadSources(ids: string[]): Promise<Source[]> {

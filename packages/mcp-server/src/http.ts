@@ -31,6 +31,7 @@ import {
   type Store,
 } from "./tools/index.js";
 import { shouldIndexOnly, sweepEnabled } from "./pull-first.js";
+import { claimsEnabled, museIndexEnabled } from "./claims.js";
 
 /** Placeholder when the caller already indexed; MetaClient is never constructed. */
 const CLIENT_INDEX_MODEL: JsonModel = {
@@ -148,6 +149,8 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
     // Pull-first: tool sessions index by default (title + summary). Full claim
     // extract only when PLUMB_FULL_EXTRACT=1 or the project is allowlisted.
     let data = parsed.data;
+    // Claims suspended: every ingest (docs and email too) is index-only.
+    if (!claimsEnabled() && !data.index_only) data = { ...data, index_only: true };
     if (shouldIndexOnly(data)) {
       data = { ...data, index_only: true };
       console.log(
@@ -161,7 +164,7 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
     try {
       // Host-indexed sessions never touch Muse; don't require META_MODEL_API_KEY.
       const model =
-        opts.model ?? (hasClientIndex(data) ? CLIENT_INDEX_MODEL : new MetaClient());
+        opts.model ?? (hasClientIndex(data) || (data.index_only && !museIndexEnabled()) ? CLIENT_INDEX_MODEL : new MetaClient());
       const result = await ingest(scoped(req), model, data);
       res.json(result);
     } catch (err) {
@@ -205,7 +208,7 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
     }
     // Pull-first: sweep (what changed) is opt-in via PLUMB_ENABLE_SWEEP=1.
     // Legacy pause also keeps it off.
-    if (!sweepEnabled() || extractionPaused()) {
+    if (!claimsEnabled() || !sweepEnabled() || extractionPaused()) {
       console.log(JSON.stringify({ sweep_pause: true, enabled: sweepEnabled(), paused: extractionPaused() }));
       res.json({
         since: new Date().toISOString(),

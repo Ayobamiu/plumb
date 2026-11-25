@@ -39,6 +39,12 @@ export const Source = z.object({
   label: z.enum(["personal"]).optional(),
   project_id: z.string().optional(),
   user_id: z.string().optional(), // the Supabase Auth user it belongs to (added Oct 28, Usman OK'd)
+  // Cheap cross-tool read (added Nov 25, Usman OK'd). summary and last_at are kept
+  // by a trigger on events; digest is the last turns of a session (secrets
+  // stripped by the client), so get_context can hand over real substance.
+  summary: z.string().optional(),
+  digest: z.string().optional(),
+  last_at: Timestamp.optional(),
 });
 export type Source = z.infer<typeof Source>;
 

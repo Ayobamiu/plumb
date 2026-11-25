@@ -8,8 +8,10 @@ import { startGmail } from "./gmail.js";
 import { startSweep } from "./sweep.js";
 
 async function main(): Promise<void> {
-  console.log("plumb watchers worker starting (gmail + clock + sweep + docs)");
-  await Promise.all([startGmail(), startClock(), startSweep(), startDocs()]);
+  // Claims suspended (PLUMB_CLAIMS=0, Nov 25): the clock and sweep only serve claims.
+  const claims = process.env.PLUMB_CLAIMS !== "0";
+  console.log(`plumb watchers worker starting (gmail + docs${claims ? " + clock + sweep" : "; claims suspended, no clock or sweep"})`);
+  await Promise.all([startGmail(), startDocs(), ...(claims ? [startClock(), startSweep()] : [])]);
 }
 
 main().catch((err) => {

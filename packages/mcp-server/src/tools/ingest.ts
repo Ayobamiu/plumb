@@ -18,7 +18,9 @@ import {
   indexSession,
   isGenericTitle,
   knownThreads,
+  localIndex,
   placeLabel,
+  sessionDigest,
   type IngestInput,
   type IngestOutput,
   type JsonModel,
@@ -27,6 +29,7 @@ import {
 import { basename } from "node:path";
 import { createHandlers, ToolError } from "./handlers.js";
 import type { Store } from "./store.js";
+import { museIndexEnabled } from "../claims.js";
 
 const MAX_CHARS = 200_000; // about 50k tokens; longer text keeps its end, the most recent part
 const FALLBACK_SUMMARY = 600; // if extraction failed: the end of the text, the most recent part
@@ -211,6 +214,9 @@ async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof I
       personal: input.personal ?? false,
       indexed_by: input.indexed_by?.trim() || `client/${input.source.kind}`,
     };
+  } else if (!museIndexEnabled()) {
+    // No client summary and Muse not asked for: the free local index (Nov 25).
+    indexed = localIndex(input.text, { title: input.source.title, sourceKind: input.source.kind });
   } else {
     try {
       indexed = await indexSession(model, { text: input.text, source: input.source });
@@ -226,7 +232,12 @@ async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof I
   const label = input.source.label ?? (indexed.personal ? "personal" : undefined);
   // Docs are shared across projects (see contexts.ts), so they never take one.
   const project_id = input.source.kind === "doc" ? undefined : project?.id;
-  const source = { ...input.source, ...(title && { title }), ...(label && { label }), ...(project_id && { project_id }) };
+  // The last turns, so get_context can hand another tool real substance (Nov 25).
+  // Text that continues an earlier save is added to what is stored.
+  // ScopedStore fills in the user; an unscoped store finds nothing and the digest starts fresh.
+  const previous = await store.findSource("", input.source.kind, input.source.external_id);
+  const digest = sessionDigest(previous?.digest, input.text);
+  const source = { ...input.source, ...(title && { title }), ...(label && { label }), ...(project_id && { project_id }), ...(digest && { digest }) };
 
   const recorded = await createHandlers(store, {}).record_event({
     kind: source.kind === "doc" ? "doc_edited" : "session_note",

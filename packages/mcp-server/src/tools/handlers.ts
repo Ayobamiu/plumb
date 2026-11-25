@@ -48,6 +48,7 @@ import {
 } from "@plumb/core";
 import { findContext, readContext, recentWork } from "./contexts.js";
 import { ConflictError, type ClaimUpdate, type Store } from "./store.js";
+import { claimsEnabled } from "../claims.js";
 
 export class ToolError extends Error {
   constructor(
@@ -238,6 +239,8 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
 
     async get_project_state(input: z.infer<typeof GetProjectStateInput>): Promise<z.infer<typeof GetProjectStateOutput>> {
       const project = await mustProject(store, input.project_id);
+      // Claims suspended: nothing to report, and no reason to read them.
+      if (!claimsEnabled()) return { project, in_claims: {}, changed_since: [], markdown: "", quiet_claims: [], coverage: [] };
       const since = input.since ?? new Date(Date.now() - DAY_MS).toISOString();
       const claims = await store.loadClaims({ project_id: project.id });
       const byId = new Map(claims.map((c) => [c.id, c]));
@@ -319,8 +322,31 @@ export function createHandlers(store: Store, opts: HandlerOptions = {}) {
     async record_event(input: z.infer<typeof RecordEventInput>): Promise<z.infer<typeof RecordEventOutput>> {
       // A watcher that crashes mid-page sends the same mail again on its next
       // poll. That must not add a row or pay for model checks a second time.
+      // Claims suspended: a clock tick has nothing to break, so it costs nothing.
+      if (input.kind === "clock" && !claimsEnabled()) {
+        const now = new Date().toISOString();
+        return { event: { id: randomUUID(), kind: "clock", source_id: "clock", occurred_at: input.occurred_at, observed_at: now, summary: input.summary }, transitions: [] };
+      }
       const replayed = await alreadyRecorded(store, input);
       if (replayed) return { event: replayed, transitions: [] };
+
+      // Claims suspended: store the event (search and get_context read it), skip invalidation.
+      if (!claimsEnabled()) {
+        const ctx = context();
+        const source = await store.upsertSource(input.source);
+        const event: Event = {
+          id: ctx.newId(),
+          kind: input.kind,
+          source_id: source.id,
+          occurred_at: input.occurred_at,
+          observed_at: ctx.now,
+          summary: input.summary,
+          ...(input.from !== undefined && { from: input.from }),
+          ...(input.thread_id !== undefined && { thread_id: input.thread_id }),
+        };
+        await store.apply({ event, updates: [], transitions: [] });
+        return { event, transitions: [] };
+      }
 
       const partB = await withRetry(async () => {
         const ctx = context();

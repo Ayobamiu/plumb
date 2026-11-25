@@ -40,6 +40,22 @@ export interface EventFilter {
   source_ids?: string[];
 }
 
+/** Recent sources for one user (cheap read path, Nov 25). Never includes digest. */
+export interface SourceListFilter {
+  user_id: string;
+  since?: string; // last_at on or after
+  project_id?: string; // docs are shared, so they always pass
+  kinds?: Source["kind"][];
+  limit?: number;
+}
+
+/** Full-text search over title, summary and digest; best first. */
+export interface SourceSearchFilter extends SourceListFilter {
+  words: string[];
+}
+
+export type SourceHit = Source & { rank: number };
+
 export interface TransitionFilter {
   claim_ids?: string[];
   since?: string; // at after this time
@@ -53,6 +69,10 @@ export interface Store {
   createProject(name: string, user_id: string, workspace?: string): Promise<Project>;
   upsertSource(source: Omit<Source, "id">): Promise<Source>;
   getSource(id: string): Promise<Source | undefined>;
+  /** One user's source by its natural key, with digest. */
+  findSource(user_id: string, kind: Source["kind"], external_id: string): Promise<Source | undefined>;
+  listSources(filter: SourceListFilter): Promise<Source[]>;
+  searchSources(filter: SourceSearchFilter): Promise<SourceHit[]>;
   loadSources(ids: string[]): Promise<Source[]>;
   loadClaims(filter?: ClaimFilter): Promise<Claim[]>;
   loadReasons(filter?: ReasonFilter): Promise<Reason[]>;

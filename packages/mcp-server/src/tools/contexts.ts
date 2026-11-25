@@ -10,9 +10,12 @@ import {
   gatherCandidates,
   matchesQuery,
   parseContextUri,
+  parseSearchQuery,
   renderContext,
+  renderSessionContext,
   searchByDescription,
   sharedWords,
+  SourceKind,
   toolLabel,
   type Claim,
   type ContextEntry,
@@ -28,6 +31,7 @@ import {
 } from "@plumb/core";
 import { ToolError } from "./handlers.js";
 import type { Store } from "./store.js";
+import { claimsEnabled } from "../claims.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LIST_DAYS = 14;
@@ -55,12 +59,96 @@ function inProject(source: Source, project: string | undefined, wanted: string |
   return source.kind === "doc" || !wanted;
 }
 
+// ---- Cheap read path (Nov 25, claims suspended): one sources table, no claims, no model. ----
+
+const FIND_DAYS = 365;
+const FIND_LIMIT = 5;
+const FALLBACK_DAYS = 14;
+// The @ list and recent work are about sessions; email threads are found by search only.
+const SESSION_LIKE = SourceKind.options.filter((k) => k !== "gmail_thread");
+const daysAgo = (days: number) => new Date(Date.now() - days * DAY_MS).toISOString();
+
+function entryOf(raw: Source, why?: string): ContextEntry {
+  const summary = raw.summary ?? "";
+  const title = displayTitle(raw.title, summary);
+  const s: Source = { ...raw, ...(title ? { title } : {}) };
+  const lastAt = s.last_at ?? new Date(0).toISOString();
+  return {
+    uri: contextUri(s),
+    name: contextName(s, lastAt),
+    description: summary.replace(/\s+/g, " ").trim().slice(0, 200),
+    source_id: s.id,
+    ...(s.project_id && { project_id: s.project_id }),
+    tool: toolLabel(s.kind),
+    ...(s.title && { title: s.title }),
+    last_at: lastAt,
+    ...(why && { why }),
+  };
+}
+
+async function listCheap(store: Store, input: { project_id?: string; query?: string; limit?: number; days?: number }) {
+  const rows = await store.listSources({
+    user_id: "", // ScopedStore supplies the user
+    since: daysAgo(input.days ?? LIST_DAYS),
+    kinds: SESSION_LIKE,
+    ...(input.project_id && { project_id: input.project_id }),
+    limit: input.query ? 1000 : (input.limit ?? 30),
+  });
+  return rows
+    .filter((s) => !input.query || matchesQuery(s, s.summary ?? "", input.query))
+    .slice(0, input.limit ?? 30)
+    .map((s) => entryOf(s));
+}
+
+async function findCheap(store: Store, input: z.infer<typeof FindContextInput>) {
+  const { words, kinds } = parseSearchQuery(input.query);
+  const limit = input.limit ?? FIND_LIMIT;
+  const scope = { user_id: "", ...(kinds && { kinds }), ...(input.project_id && { project_id: input.project_id }) };
+  const hits = words.length ? await store.searchSources({ ...scope, words, since: daysAgo(FIND_DAYS), limit }) : [];
+  if (hits.length) {
+    // rank >= 1: the session has every word. Below that it shares only some, so
+    // it reads as a near miss and the asking tool says it wasn't clearly found.
+    return {
+      contexts: hits.map((h) => {
+        const seen = `${h.title ?? ""} ${h.summary ?? ""}`.toLowerCase();
+        const named = words.filter((w) => seen.includes(w));
+        const which = named.length ? named.join(", ") : "words in its recent turns";
+        return entryOf(h, h.rank >= 1 ? `Matches: ${which}` : `${NO_MATCH}: shares only ${which}`);
+      }),
+    };
+  }
+  // Nothing matched: the newest sessions (of the tool they named, if any), as near misses.
+  const recent = await store.listSources({ ...scope, kinds: kinds ?? SESSION_LIKE, since: daysAgo(FALLBACK_DAYS), limit });
+  return { contexts: recent.map((s) => entryOf(s, `${NO_MATCH}: a recent ${toolLabel(s.kind)} session, none of your words matched`)) };
+}
+
+async function readCheap(store: Store, input: z.infer<typeof GetContextInput>): Promise<z.infer<typeof GetContextOutput>> {
+  let id = input.source_id;
+  if (!id) {
+    if (!input.uri) throw new ToolError("bad_input", "give uri or source_id");
+    const parsed = parseContextUri(input.uri);
+    if (!parsed) throw new ToolError("bad_input", `not a Plumb context: ${input.uri}`);
+    const hits = (await store.listSources({ user_id: "", since: daysAgo(FIND_DAYS), limit: 1000 })).filter((s) => s.id.startsWith(parsed.idPrefix));
+    if (hits.length !== 1) throw new ToolError("not_found", hits.length ? `ambiguous context ${input.uri}` : `no recent context ${input.uri}`);
+    id = hits[0]!.id;
+  }
+  const [source] = await store.loadSources([id]); // with digest
+  if (!source) throw new ToolError("not_found", `unknown source ${id}`);
+  const events = await store.loadEvents({ kinds: NEWS_KINDS, source_ids: [source.id] });
+  let lastAt = source.last_at ?? new Date(0).toISOString();
+  for (const e of events) lastAt = later(lastAt, e.occurred_at)!;
+  const title = displayTitle(source.title, source.summary ?? "");
+  const shown: Source = { ...source, ...(title ? { title } : {}) };
+  return { uri: contextUri(shown), name: contextName(shown, lastAt), markdown: renderSessionContext({ source: shown, lastAt, events }) };
+}
+
 const later = (a: string | undefined, b: string) => (!a || Date.parse(b) > Date.parse(a) ? b : a);
 
 export async function listContexts(
   store: Store,
   input: { project_id?: string; query?: string; limit?: number; days?: number },
 ): Promise<ContextEntry[]> {
+  if (!claimsEnabled()) return listCheap(store, input);
   const since = new Date(Date.now() - (input.days ?? LIST_DAYS) * DAY_MS).toISOString();
   const [events, claims] = await Promise.all([
     store.loadEvents({ kinds: NEWS_KINDS, observed_after: since }),
@@ -141,6 +229,7 @@ async function resolve(store: Store, input: z.infer<typeof GetContextInput>): Pr
 }
 
 export async function readContext(store: Store, input: z.infer<typeof GetContextInput>): Promise<z.infer<typeof GetContextOutput>> {
+  if (!claimsEnabled()) return readCheap(store, input);
   const source = await resolve(store, input);
   const [events, claims] = await Promise.all([
     store.loadEvents({ kinds: NEWS_KINDS, source_ids: [source.id] }) as Promise<Event[]>,
@@ -218,6 +307,7 @@ async function relatedFor(store: Store, ownIds: string[]) {
 // sessions sharing the most words come back, each why starting "Basic search",
 // so a failed model never looks like "nothing saved".
 export async function findContext(store: Store, input: z.infer<typeof FindContextInput>, model?: JsonModel) {
+  if (!claimsEnabled()) return findCheap(store, input);
   const scope = { ...(input.project_id && { project_id: input.project_id }) };
   const all = await listContexts(store, { ...scope, days: SEARCH_DAYS, limit: 1000 });
   const ids = all.map((e) => e.source_id);
