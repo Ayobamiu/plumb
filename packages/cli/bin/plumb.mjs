@@ -24,6 +24,7 @@ import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { post, PlumbError, saveSession } from "../lib/api.mjs";
+import { wantFullExtract } from "../lib/full-extract.mjs";
 import { DEFAULT_API, home, loadConfig, loadState, saveConfig, saveState } from "../lib/config.mjs";
 import { copyApp, hasClaudeCode, hasClaudeDesktop, hasCursor, installClaudeCode, installClaudeDesktop, installCursor, installSync, makeDesktopSkill, refreshApp, uninstall } from "../lib/install.mjs";
 import { changeNote } from "../lib/note.mjs";
@@ -223,17 +224,20 @@ function summarize(groups) {
   }
 }
 
-// Claims only matter while work is current: sessions from the last 30 days are
-// read in full; older ones are indexed (title and summary), still findable by
-// description. --full-all reads everything in full, --index nothing.
+// Pull-first: index by default (title + summary). --full-all opts into claim
+// extract for recent sessions; --index forces index for everything.
 async function sendByAge(config, sessions, opts = {}) {
   const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
-  const recent = sessions.filter((s) => !flag("--index") && (flag("--full-all") || Date.parse(s.modified_at ?? 0) >= cutoff));
+  const wantFull = !flag("--index") && (flag("--full-all") || process.env.PLUMB_FULL_EXTRACT === "1");
+  const recent = sessions.filter((s) => wantFull && Date.parse(s.modified_at ?? 0) >= cutoff);
   const older = sessions.filter((s) => !recent.includes(s));
   const totals = { sent: 0, failed: 0 };
-  for (const [list, index] of [[recent, false], [older, true]]) {
+  for (const [list, index] of [
+    [recent, false],
+    [older, true],
+  ]) {
     if (!list.length) continue;
-    if (index && recent.length && !opts.quiet) console.log(`  Older than ${RECENT_DAYS} days, indexed only:`);
+    if (index && recent.length && !opts.quiet) console.log(`  Indexed (pull-first catalog):`);
     const r = await send(config, list, { ...opts, index });
     totals.sent += r.sent;
     totals.failed += r.failed;
@@ -252,7 +256,7 @@ async function backfill() {
   console.log("Past sessions on this computer:");
   summarize(groups);
   if (!all.length) return;
-  console.log(`\nFor sessions from the last ${RECENT_DAYS} days, Plumb writes down what each decided and planned, so it can tell you later what stopped being true. Older ones get a title and a summary, so you can still find them. Personal ones are marked, secrets are stripped first, and sessions already saved are skipped.`);
+  console.log(`\nPull-first: each session gets a title and summary so you can find it from any tool. Add --full-all (or PLUMB_FULL_EXTRACT=1) to also extract claims for the last ${RECENT_DAYS} days. Personal ones are marked, secrets are stripped first, and sessions already saved are skipped.`);
   if (flag("--dry-run") || !(await ask(`Bring in ${all.length} sessions now?`))) {
     console.log(`Nothing sent. Run \`npx plumb-ai backfill\` when you're ready${process.stdin.isTTY ? "" : " (add --yes to skip the question)"}.\n`);
     return;
@@ -327,7 +331,7 @@ async function saveNow() {
   const all = [...listClaudeCodeSessions(), ...(await listCursorChats())];
   const mine = all.filter((s) => (s.workspace ?? s.read().workspace) === here).sort((a, b) => String(b.modified_at).localeCompare(String(a.modified_at))).slice(0, 3);
   if (!mine.length) return console.log(`No sessions found for ${here}.`);
-  await send(config, mine);
+  await send(config, mine, { index: !wantFullExtract() });
 }
 
 /** The numbers: what Plumb has saved and caught for this account. Test projects don't count. */
@@ -444,10 +448,12 @@ async function hookSend() {
   }
   if (!session) return hookLog(`${tool} ${id}: session not found`);
   try {
-    const saved = await saveOne(config, state, session, session.read());
+    // Pull-first: index unless full extract is opted in.
+    const index = !wantFullExtract();
+    const saved = await saveOne(config, state, session, session.read(), { index });
     if (!saved) return;
     saveState(state);
-    hookLog(`${tool} ${id}: saved`);
+    hookLog(`${tool} ${id}: saved (${index ? "index" : "full"})`);
   } catch (err) {
     hookLog(`${tool} ${id}: ${err.message}`);
   }

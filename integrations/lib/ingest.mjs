@@ -5,8 +5,16 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { apiBase, projectId } from "./plumb-env.mjs";
+import { wantFullExtract } from "./full-extract.mjs";
 
 const MAX_CHARS = 180_000;
+const HEAD_CHARS = 10_000;
+const TAIL_CHARS = 30_000;
+
+function excerpt(text) {
+  if (text.length <= HEAD_CHARS + TAIL_CHARS) return text;
+  return `${text.slice(0, HEAD_CHARS)}\n\n[... ${text.length - HEAD_CHARS - TAIL_CHARS} characters left out ...]\n\n${text.slice(-TAIL_CHARS)}`;
+}
 
 export async function ingestText({
   text,
@@ -14,13 +22,26 @@ export async function ingestText({
   externalId,
   title,
   token,
-  indexOnly = false,
+  indexOnly,
   label,
   projectId: projectIdOverride,
   at,
 }) {
   const trimmed = String(text ?? "").trim();
   if (!trimmed) return { skipped: true, reason: "empty" };
+
+  const pid =
+    projectIdOverride !== undefined
+      ? projectIdOverride
+      : (() => {
+          try {
+            return projectId();
+          } catch {
+            return undefined;
+          }
+        })();
+  // Pull-first: index by default; full extract only when opted in.
+  const useIndex = indexOnly !== undefined ? indexOnly : !wantFullExtract(pid);
 
   const source = {
     kind: sourceKind,
@@ -33,27 +54,20 @@ export async function ingestText({
   if (label === "personal") source.label = "personal";
   const body = {
     source,
-    text: trimmed.length > MAX_CHARS ? trimmed.slice(-MAX_CHARS) : trimmed,
+    text: useIndex
+      ? excerpt(trimmed)
+      : trimmed.length > MAX_CHARS
+        ? trimmed.slice(-MAX_CHARS)
+        : trimmed,
   };
   // When the text was written, for past sessions. Without it the server uses now.
   if (at) body.at = at;
   // Full extraction needs a project. Index mode may omit it (personal / unknown).
-  if (indexOnly) {
+  if (useIndex) {
     body.index_only = true;
-    const pid =
-      projectIdOverride !== undefined
-        ? projectIdOverride
-        : (() => {
-            try {
-              return projectId();
-            } catch {
-              return undefined;
-            }
-          })();
     if (pid) body.project_id = pid;
   } else {
-    body.project_id =
-      projectIdOverride !== undefined ? projectIdOverride : projectId();
+    body.project_id = pid !== undefined ? pid : projectId();
   }
 
   const res = await fetch(`${apiBase()}/ingest`, {
