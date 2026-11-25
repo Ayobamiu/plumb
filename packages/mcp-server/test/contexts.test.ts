@@ -185,6 +185,27 @@ describe("ingest: index mode", () => {
     expect([...(store as any).sources].some((s: any) => s.external_id === "conv-fail")).toBe(false);
     await expect(ingest(store, failing, { source: { kind: "cursor", external_id: "conv-np" }, text: "x" })).rejects.toMatchObject({ code: "bad_input" });
   });
+
+  it("accepts a host-supplied index and never calls the model", async () => {
+    const { store, project } = await setup();
+    const seen: string[] = [];
+    const model = indexer({ title: "should-not-run", summary: "nope", personal: false }, seen);
+    const out = await ingest(store, model, {
+      index_only: true,
+      project_id: project.id,
+      source: { kind: "claude_code", external_id: "host-idx-1", title: "Clock tick fix" },
+      text: "User:\nfix the clock scan\n\nClaude:\ndone",
+      summary: "Claude Code fixed the clock-tick full graph scan on Plumb.",
+      personal: false,
+      indexed_by: "anthropic/claude-haiku/index.v1",
+    });
+    expect(seen).toEqual([]);
+    expect(out.indexed_only).toBe(true);
+    expect(out.extracted_by).toBe("anthropic/claude-haiku/index.v1");
+    expect(out.event.summary).toContain("clock-tick");
+    const source = [...(store as any).sources].find((s: any) => s.external_id === "host-idx-1");
+    expect(source).toMatchObject({ title: "Clock tick fix", project_id: project.id });
+  });
 });
 
 describe("dates", () => {

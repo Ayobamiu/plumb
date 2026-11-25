@@ -19,6 +19,7 @@ import { deviceRoutes } from "./device.js";
 import { ScopedStore } from "./tools/scoped-store.js";
 import {
   callTool,
+  hasClientIndex,
   ingest,
   isToolName,
   listLinkSuggestions,
@@ -30,6 +31,13 @@ import {
   type Store,
 } from "./tools/index.js";
 import { shouldIndexOnly, sweepEnabled } from "./pull-first.js";
+
+/** Placeholder when the caller already indexed; MetaClient is never constructed. */
+const CLIENT_INDEX_MODEL: JsonModel = {
+  json: async () => {
+    throw new Error("MetaClient not used for client-indexed ingest");
+  },
+};
 
 export interface HttpOptions {
   store?: Store & AuthStore;
@@ -151,7 +159,10 @@ export function createHttpApp(opts: HttpOptions = {}): Express {
       );
     }
     try {
-      const result = await ingest(scoped(req), opts.model ?? new MetaClient(), data);
+      // Host-indexed sessions never touch Muse; don't require META_MODEL_API_KEY.
+      const model =
+        opts.model ?? (hasClientIndex(data) ? CLIENT_INDEX_MODEL : new MetaClient());
+      const result = await ingest(scoped(req), model, data);
       res.json(result);
     } catch (err) {
       sendToolError(res, err);

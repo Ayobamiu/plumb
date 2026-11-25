@@ -188,21 +188,37 @@ async function resolveProject(store: Store, input: z.infer<typeof IngestInput>):
   return input.workspace ? workspaceProject(store, input.workspace) : undefined;
 }
 
-// Index mode: one low-effort call for a title, a summary and whether it's
-// personal, then the summary is recorded as an event so search can find the
-// session. No claims and no Part C model check, which keeps it cheap enough to
-// run on every session from every tool. Part B still runs (plain code).
+/** True when the caller already indexed the session (skip Muse Spark). */
+export function hasClientIndex(input: z.infer<typeof IngestInput>): boolean {
+  return Boolean(input.index_only && input.summary?.trim());
+}
+
+// Index mode: title + summary so search can find the session. Prefer a
+// client-supplied index (host LLM or local hook). Muse Spark is only the
+// fallback when the caller still sends raw text with no summary. No claims and
+// no Part C model check. Part B still runs (plain code).
 async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof IngestInput>): Promise<z.infer<typeof IngestOutput>> {
   const project = await resolveProject(store, input);
   const now = new Date().toISOString();
   const started = Date.now();
-  let indexed;
-  try {
-    indexed = await indexSession(model, { text: input.text, source: input.source });
-  } catch (err) {
-    const why = err instanceof Error ? err.message : String(err);
-    console.log(JSON.stringify({ ingest: input.source.kind, external_id: input.source.external_id, index_only: true, ok: false, error: why.slice(0, 300), chars: input.text.length, ms: Date.now() - started }));
-    throw new ToolError("unavailable", `indexing failed, nothing was saved; send the text again later (${why})`);
+  let indexed: { title: string; summary: string; personal: boolean; indexed_by: string };
+  const clientSummary = input.summary?.trim();
+  if (clientSummary) {
+    const nativeTitle = input.source.title?.trim();
+    indexed = {
+      title: (nativeTitle && !isGenericTitle(nativeTitle) ? nativeTitle : nativeTitle || "").slice(0, 80),
+      summary: clientSummary.slice(0, 600),
+      personal: input.personal ?? false,
+      indexed_by: input.indexed_by?.trim() || `client/${input.source.kind}`,
+    };
+  } else {
+    try {
+      indexed = await indexSession(model, { text: input.text, source: input.source });
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      console.log(JSON.stringify({ ingest: input.source.kind, external_id: input.source.external_id, index_only: true, ok: false, error: why.slice(0, 300), chars: input.text.length, ms: Date.now() - started }));
+      throw new ToolError("unavailable", `indexing failed, nothing was saved; send the text again later (${why})`);
+    }
   }
 
   const nativeTitle = input.source.title?.trim();
@@ -218,7 +234,17 @@ async function indexOnly(store: Store, model: JsonModel, input: z.infer<typeof I
     occurred_at: input.at ?? now,
     summary: indexed.summary || title || "(no summary)",
   });
-  console.log(JSON.stringify({ ingest: source.kind, external_id: source.external_id, index_only: true, ok: true, chars: input.text.length, ms: Date.now() - started, label: label ?? null, title: source.title ?? null }));
+  console.log(JSON.stringify({
+    ingest: source.kind,
+    external_id: source.external_id,
+    index_only: true,
+    ok: true,
+    client_index: Boolean(clientSummary),
+    chars: input.text.length,
+    ms: Date.now() - started,
+    label: label ?? null,
+    title: source.title ?? null,
+  }));
 
   return {
     claims: [],

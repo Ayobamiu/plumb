@@ -19,3 +19,5 @@ The user's words after `/plumb` are a description, not keywords: $ARGUMENTS
 6. Otherwise results come best first. Call `get_context` on the first one, say in one line why it fits (its `why`), and list the others in one line each as `tool: title (date), why`.
 
 Present the `get_context` result as: what happened, what is still true, what is no longer true and why, and what waits for review. Keep it short and plain. Never use em dashes.
+
+When this session finishes real work worth finding later, index it with Plumb using this conversation (your plan), not Muse: call `record_event` with kind `session_note`, the matching source kind, a short title, and a 2–4 sentence summary.

@@ -1,20 +1,18 @@
 /**
  * POST text to Plumb /ingest. Hooks must send text, never a local file path
  * (the server runs remotely and cannot read your disk).
+ *
+ * Preferred: the in-session model indexes via MCP record_event (plan usage).
+ * This helper is the hook/backfill path: a local no-model index is attached so
+ * /ingest never needs Muse Spark for index_only.
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { apiBase, projectId } from "./plumb-env.mjs";
 import { wantFullExtract } from "./full-extract.mjs";
+import { hostIndex, indexExcerpt } from "./host-index.mjs";
 
 const MAX_CHARS = 180_000;
-const HEAD_CHARS = 10_000;
-const TAIL_CHARS = 30_000;
-
-function excerpt(text) {
-  if (text.length <= HEAD_CHARS + TAIL_CHARS) return text;
-  return `${text.slice(0, HEAD_CHARS)}\n\n[... ${text.length - HEAD_CHARS - TAIL_CHARS} characters left out ...]\n\n${text.slice(-TAIL_CHARS)}`;
-}
 
 export async function ingestText({
   text,
@@ -26,6 +24,10 @@ export async function ingestText({
   label,
   projectId: projectIdOverride,
   at,
+  /** Precomputed index; when set, hostIndex is skipped. */
+  summary,
+  personal,
+  indexedBy,
 }) {
   const trimmed = String(text ?? "").trim();
   if (!trimmed) return { skipped: true, reason: "empty" };
@@ -47,7 +49,6 @@ export async function ingestText({
     kind: sourceKind,
     external_id: String(externalId).slice(0, 200),
   };
-  // Omit title when the hook has none, so /ingest keeps Muse Spark's generated title.
   if (title && String(title).trim()) {
     source.title = String(title).trim().slice(0, 200);
   }
@@ -55,7 +56,7 @@ export async function ingestText({
   const body = {
     source,
     text: useIndex
-      ? excerpt(trimmed)
+      ? indexExcerpt(trimmed)
       : trimmed.length > MAX_CHARS
         ? trimmed.slice(-MAX_CHARS)
         : trimmed,
@@ -66,6 +67,30 @@ export async function ingestText({
   if (useIndex) {
     body.index_only = true;
     if (pid) body.project_id = pid;
+    // Host indexes here so Railway mcp never needs Muse for sessions.
+    const indexed =
+      summary && String(summary).trim()
+        ? {
+            title: source.title,
+            summary: String(summary).trim(),
+            personal: personal ?? false,
+            indexed_by: indexedBy || `client/${sourceKind}`,
+          }
+        : await hostIndex(trimmed, {
+            title: source.title,
+            sourceKind,
+          });
+    if (indexed.title && !source.title) {
+      source.title = indexed.title.slice(0, 200);
+      body.source = source;
+    }
+    body.summary = indexed.summary;
+    body.personal = indexed.personal;
+    body.indexed_by = indexed.indexed_by;
+    if (indexed.personal && !source.label) {
+      source.label = "personal";
+      body.source = source;
+    }
   } else {
     body.project_id = pid !== undefined ? pid : projectId();
   }

@@ -18,3 +18,7 @@ Treat the text after `/plumb` as a description in the user's own words, not keyw
 4. Otherwise results come best first. Call `get_context` on the first one, say in one line why it fits (its `why`), and list the others in one line each as `tool: title (date), why`.
 
 Present the `get_context` result as: what happened, what is still true, what is no longer true and why, and what waits for review. Keep it short and plain. Never use em dashes.
+
+## Session index (write-back)
+
+When this chat finishes real work worth finding later, index it yourself with Plumb (this Claude plan, not Muse). Call `record_event` with kind `session_note`, source kind `claude_chat`, a short title, and a 2–4 sentence summary. Set `source.label` to `personal` only for personal life. Keep it short; do not narrate the tool call.

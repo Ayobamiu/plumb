@@ -146,6 +146,12 @@ export const IngestInput = z.object({
   // Index mode (Oct 28, Usman OK'd): one low-effort call writes a title and a
   // summary so search can find the session; no claims, no model check.
   index_only: z.boolean().optional(),
+  // Host-model ingest (Nov 25): the tool that produced the session can send
+  // the index itself (Claude for Claude Code, Cursor for Cursor, …). When
+  // summary is set, /ingest skips Muse Spark for index_only.
+  summary: z.string().min(1).max(1000).optional(),
+  personal: z.boolean().optional(),
+  indexed_by: z.string().min(1).max(200).optional(), // who wrote the index, e.g. anthropic/claude-haiku/index.v1
   text: z.string().min(1),
   at: Timestamp.optional(), // when the text was written; default now
 });

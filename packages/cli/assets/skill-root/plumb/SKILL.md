@@ -16,4 +16,8 @@ Use the Plumb tools. The user's words after `/plumb` are a description, not keyw
 
 Present `get_context` as: what happened, what is still true, what is no longer true and why, and what may be out of date. Keep it short and plain. Never use em dashes.
 
+## Session index
+
+When a session finishes real work worth finding later, index it with Plumb using this conversation (your plan), not Muse. Call `record_event` with kind `session_note`, the matching source kind (`claude_code`, `cursor`, `claude_chat`, or `muse_code`), a short title, and a 2–4 sentence summary. Label `personal` only for personal life. Do not narrate the tool call.
+
 If the Plumb tools aren't available, say Plumb isn't connected and suggest running `npx plumb-ai init`, then restarting Claude.

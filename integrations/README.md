@@ -27,7 +27,7 @@ From repo-root `.env`:
 ## Notes
 
 - Cursor hooks only send data out. Do not rely on hook stdout reaching the model except `sessionStart.additional_context`.
-- Claude Code: Stop mid-session saves at most every 15 minutes (new turns only, same session id). SessionEnd sends the final new turns. No generic titles.
+- Claude Code: Stop asks the in-session Claude (plan usage) to index via MCP `record_event` at most every 15 minutes when there are new turns. SessionEnd posts a local no-model `/ingest` fallback. No Muse, no Anthropic API.
 - Cursor: afterAgentResponse / stop / sessionEnd ingest under `conversation_id` only (never a shared `cursor-session` id). Prefer `transcript_path` labeled Usman:/Cursor: turns. One-line debug log: `logs/cursor-hooks.log`.
 - Cursor Agent / Cloud Agents often do not fire project hooks. Backfill local Agent chats with `node integrations/cursor/sync-transcripts.mjs --project plumb` (index mode by default; `--full` for claim extraction). There is no Cursor API to list every chat.
 - Claude.ai history: download the export zip while signed in, then `node integrations/claude-chat/import-export.mjs <zip>` (index mode). The email download link does not work without sign-in, so Gmail cannot fetch it alone.

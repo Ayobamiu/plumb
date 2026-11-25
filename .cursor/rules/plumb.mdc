@@ -46,6 +46,20 @@ Auth: Gmail OAuth in testing mode, refresh token encrypted in Supabase Vault, on
 - Hook formats change. Check current docs before building.
 - Claude.ai export download links require sign-in; import from a downloaded file, not from Gmail alone.
 
+## Session index (write-back)
+
+When a task wraps up with real work (a fix, decision, or plan), index this Cursor session in Plumb yourself using this chat's model (Cursor plan). Do not rely on Muse.
+
+Call Plumb `record_event` once:
+
+- `kind`: `"session_note"`
+- `source`: `{ kind: "cursor", external_id: "<this conversation id if known, else a stable short id>", title: "<≤60 chars>" }`
+- `occurred_at`: now (ISO)
+- `summary`: 2–4 plain sentences naming topics and outcomes for later search
+- `source.label`: `"personal"` only for personal life
+
+Keep it short. Do not narrate the tool call. Hooks may still post a local no-model backup.
+
 ## Rules
 
 - Never print, log or commit .env or any key.

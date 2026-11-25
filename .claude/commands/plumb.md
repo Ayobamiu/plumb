@@ -20,4 +20,6 @@ The user's words after `/plumb` are a description, not keywords: $ARGUMENTS
 
 Present the `get_context` result as: what happened, what is still true, what is no longer true and why, and what waits for review. Keep it short and plain. Never use em dashes.
 
-The tools are `mcp__plumb__list_projects`, `mcp__plumb__get_project_state`, `mcp__plumb__find_context` and `mcp__plumb__get_context`.
+When this session finishes real work worth finding later, index it with Plumb using this conversation (your plan), not Muse: call `record_event` with kind `session_note`, source kind `claude_code`, a short title, and a 2–4 sentence summary.
+
+The tools are `mcp__plumb__list_projects`, `mcp__plumb__get_project_state`, `mcp__plumb__find_context`, `mcp__plumb__get_context`, and `mcp__plumb__record_event`.

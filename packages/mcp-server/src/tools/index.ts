@@ -82,7 +82,7 @@ export async function callTool(
 }
 
 export { createHandlers, ToolError, type HandlerOptions, type ReviewItem } from "./handlers.js";
-export { ingest } from "./ingest.js";
+export { ingest, hasClientIndex } from "./ingest.js";
 export { findContext, listContexts, readContext, recentWork } from "./contexts.js";
 export { knownThreads } from "@plumb/core"; // moved to core; kept here for existing imports
 export { sweep, type SweepResult } from "./sweep.js";

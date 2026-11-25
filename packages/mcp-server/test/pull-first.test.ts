@@ -110,4 +110,58 @@ describe("http /ingest pull-first", () => {
       );
     }
   });
+
+  it("skips Muse when the host already sent summary", async () => {
+    const store = new MemoryStore();
+    store.addProject("Host index");
+    const tokens = new Map([["test-token", "web" as const]]);
+    let indexed = 0;
+    const model = {
+      async json() {
+        indexed++;
+        throw new Error("model should not run");
+      },
+    };
+    const app = createHttpApp({
+      store,
+      tokens,
+      ownerUserId: MEMORY_USER,
+      host: "127.0.0.1",
+      model: model as never,
+    });
+    const server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/ingest`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-token",
+        },
+        body: JSON.stringify({
+          workspace: "/tmp/host-index",
+          source: { kind: "cursor", external_id: "conv-host-1", title: "Host indexed" },
+          text: "User:\nhello\n\nCursor:\nworld",
+          summary: "Cursor session about host-indexed ingest.",
+          personal: false,
+          indexed_by: "local/cursor/index.v1",
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        indexed_only?: boolean;
+        extracted_by?: string;
+        event?: { summary?: string };
+      };
+      expect(body.indexed_only).toBe(true);
+      expect(body.extracted_by).toBe("local/cursor/index.v1");
+      expect(body.event?.summary).toContain("host-indexed");
+      expect(indexed).toBe(0);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve())),
+      );
+    }
+  });
 });

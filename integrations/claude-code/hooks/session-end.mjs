@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * SessionEnd: final ingest for a Claude Code session.
- * Only turns since the last mid-session Stop save (same session id).
- * Usman + Claude Code labeled turns. No generic title. Always exit 0.
+ * SessionEnd: local no-model /ingest fallback when the in-session Claude
+ * did not index via MCP (Stop asks for that on plan usage). Only turns since
+ * the last mid-session save. Always exit 0.
  */
 import { loadRootEnv } from "../../lib/plumb-env.mjs";
 import { ingestText } from "../../lib/ingest.mjs";
